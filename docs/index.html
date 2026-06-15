@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Livro Caixa Simples</title>
+    <meta name="description" content="Gestão financeira simplificada, moderna e segura. Um livro caixa offline e super rápido.">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        emerald: {
+                            400: '#34d399',
+                            500: '#10b981',
+                            600: '#059669',
+                        },
+                        dark: {
+                            900: '#0f172a',
+                            800: '#1e293b',
+                            700: '#334155',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Custom Styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-dark-900 text-slate-200 min-h-screen relative selection:bg-emerald-500 selection:text-white">
+
+    <!-- Background glow effects -->
+    <div class="glow-bg top-[-10%] left-[-10%] bg-emerald-500/20"></div>
+    <div class="glow-bg bottom-[-10%] right-[-10%] bg-blue-500/20"></div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+        
+        <!-- Header / Nav -->
+        <header class="py-6 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-emerald-500/30">
+                    <i class="fa-solid fa-wallet"></i>
+                </div>
+                <span class="font-bold text-xl tracking-tight text-white">Livro Caixa<span class="text-emerald-400">.</span></span>
+            </div>
+            <nav class="hidden md:flex gap-6 text-sm font-medium text-slate-300">
+                <a href="#recursos" class="hover:text-emerald-400 transition-colors">Recursos</a>
+                <a href="#tecnologias" class="hover:text-emerald-400 transition-colors">Tecnologias</a>
+                <a href="https://github.com/melkyfb/livro-caixa-simples" target="_blank" class="hover:text-white transition-colors">
+                    <i class="fa-brands fa-github text-lg"></i>
+                </a>
+            </nav>
+        </header>
+
+        <!-- Hero Section -->
+        <main class="py-20 md:py-32 flex flex-col items-center text-center">
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800/50 border border-slate-700 backdrop-blur-sm text-sm font-medium text-emerald-400 mb-8 animate-fade-in-up">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse-glow"></span>
+                Versão v0.1.1 Disponível
+            </div>
+            
+            <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight text-white mb-6 animate-fade-in-up animation-delay-100 max-w-4xl">
+                Gestão Financeira <br class="hidden md:block"/>
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">Simples e Segura.</span>
+            </h1>
+            
+            <p class="text-lg md:text-xl text-slate-400 max-w-2xl mb-10 animate-fade-in-up animation-delay-200">
+                O controle das suas finanças não precisa ser complicado. Um aplicativo focado em privacidade, totalmente offline, rápido e desenhado com carinho.
+            </p>
+            
+            <div class="flex flex-col sm:flex-row gap-4 animate-fade-in-up animation-delay-300">
+                <a href="https://github.com/melkyfb/livro-caixa-simples/releases/latest" id="download-btn" class="px-8 py-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-dark-900 font-bold shadow-lg shadow-emerald-500/25 transition-all hover:-translate-y-1 hover:shadow-emerald-500/40 flex items-center justify-center gap-2">
+                    <i class="fa-brands fa-windows text-xl"></i>
+                    Download para Windows
+                </a>
+                <a href="https://github.com/melkyfb/livro-caixa-simples" target="_blank" class="px-8 py-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-medium border border-slate-700 transition-all hover:-translate-y-1 flex items-center justify-center gap-2">
+                    <i class="fa-brands fa-github text-xl"></i>
+                    Ver Código Fonte
+                </a>
+            </div>
+        </main>
+
+        <!-- Carousel Section -->
+        <section class="py-12 animate-fade-in-up animation-delay-400">
+            <div class="relative max-w-5xl mx-auto rounded-2xl p-2 bg-slate-800/30 border border-slate-700/50 backdrop-blur-md shadow-2xl">
+                <!-- Carousel Container -->
+                <div class="overflow-hidden rounded-xl relative group">
+                    <div class="carousel-track flex transition-transform duration-500 ease-in-out" id="carousel-track">
+                        <!-- Slide 1 -->
+                        <div class="min-w-full">
+                            <img src="assets/dashboard.png" alt="Dashboard" class="w-full h-auto object-cover rounded-lg border border-slate-700">
+                        </div>
+                        <!-- Slide 2 -->
+                        <div class="min-w-full">
+                            <img src="assets/transactions.png" alt="Transações" class="w-full h-auto object-cover rounded-lg border border-slate-700">
+                        </div>
+                        <!-- Slide 3 -->
+                        <div class="min-w-full">
+                            <img src="assets/settings.png" alt="Configurações" class="w-full h-auto object-cover rounded-lg border border-slate-700">
+                        </div>
+                    </div>
+                    
+                    <!-- Controls -->
+                    <button id="prev-btn" class="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-500">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <button id="next-btn" class="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-emerald-500">
+                        <i class="fa-solid fa-chevron-right"></i>
+                    </button>
+                </div>
+                
+                <!-- Indicators -->
+                <div class="flex justify-center gap-2 mt-4" id="carousel-dots">
+                    <button class="w-2 h-2 rounded-full bg-emerald-500 transition-all w-6"></button>
+                    <button class="w-2 h-2 rounded-full bg-slate-600 transition-all"></button>
+                    <button class="w-2 h-2 rounded-full bg-slate-600 transition-all"></button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section id="recursos" class="py-24">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">Por que usar o Livro Caixa Simples?</h2>
+                <p class="text-slate-400">Construído pensando na melhor experiência possível.</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Feature 1 -->
+                <div class="glass-card p-8 rounded-2xl">
+                    <div class="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-2xl mb-6">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">100% Offline e Privado</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Seus dados financeiros não vão para a nuvem. Tudo fica salvo localmente no seu computador, garantindo segurança máxima.</p>
+                </div>
+                
+                <!-- Feature 2 -->
+                <div class="glass-card p-8 rounded-2xl">
+                    <div class="w-12 h-12 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center text-2xl mb-6">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Nativo e Rápido</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Criado usando Tauri e Rust, o aplicativo consome pouquíssima memória RAM e abre instantaneamente, diferente dos apps com Electron.</p>
+                </div>
+                
+                <!-- Feature 3 -->
+                <div class="glass-card p-8 rounded-2xl">
+                    <div class="w-12 h-12 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center text-2xl mb-6">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Interface Moderna</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">Abandone planilhas complexas. Desfrute de um design escuro elegante, animações suaves e facilidade de uso inigualável.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tech Stack Section -->
+        <section id="tecnologias" class="py-24 border-t border-slate-800">
+            <div class="text-center mb-10">
+                <h2 class="text-2xl font-bold text-white mb-2">Construído com tecnologia de ponta</h2>
+                <p class="text-slate-400 text-sm">Open source e apoiado em grandes ferramentas.</p>
+            </div>
+            
+            <div class="flex flex-wrap justify-center gap-4 opacity-70 hover:opacity-100 transition-opacity">
+                <!-- Badges from shields.io -->
+                <img src="https://img.shields.io/badge/Tauri-24C8DB?style=for-the-badge&logo=tauri&logoColor=white" alt="Tauri">
+                <img src="https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white" alt="Rust">
+                <img src="https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React">
+                <img src="https://img.shields.io/badge/Vite-B73BFE?style=for-the-badge&logo=vite&logoColor=FFD62E" alt="Vite">
+                <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white" alt="Tailwind">
+                <img src="https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite">
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="py-10 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="text-slate-400 text-sm">
+                Desenvolvido como projeto Open Source sob licença MIT.
+            </div>
+            <div class="text-slate-500 text-xs">
+                Feito com <i class="fa-solid fa-heart text-red-500 mx-1"></i> pela comunidade.
+            </div>
+        </footer>
+
+    </div>
+
+    <!-- Scripts -->
+    <script src="script.js"></script>
+</body>
+</html>
