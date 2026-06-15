@@ -19,6 +19,7 @@ export const TransactionsView = () => {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [filter, setFilter] = useState<FilterType>('ALL');
+  const [currency, setCurrency] = useState('BRL');
   
   // Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -39,6 +40,12 @@ export const TransactionsView = () => {
   const loadData = async () => {
     const db = await getDatabase();
     
+    // Load Settings
+    const settingsResult = db.exec("SELECT currency FROM settings LIMIT 1");
+    if (settingsResult.length > 0) {
+      setCurrency(settingsResult[0].values[0][0] as string || 'BRL');
+    }
+
     // Load Accounts
     const accResult = db.exec("SELECT * FROM accounts");
     if (accResult.length > 0) {
@@ -71,7 +78,7 @@ export const TransactionsView = () => {
   };
 
   const handleAddTransaction = async () => {
-    if (!value || !accountId || (type !== 'Transferência' && !categoryId)) return;
+    if (!value || !accountId || (type !== 'Transferência' && !categoryId) || (type === 'Transferência' && !destinationAccountId)) return;
 
     const db = await getDatabase();
     const val = parseFloat(value);
@@ -116,7 +123,7 @@ export const TransactionsView = () => {
     loadData();
   };
 
-  const formatCurrency = (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+  const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(val);
   
   const formatDate = (dateString: string) => {
     const d = new Date(dateString);

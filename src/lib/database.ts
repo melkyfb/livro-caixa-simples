@@ -46,10 +46,15 @@ export async function getDatabase(): Promise<Database> {
         initSchema(db);
       }
     }
+    
+    // Always run migrations after loading or creating the DB
+    runMigrations(db);
+    
   } catch (e) {
     console.error("Error loading database:", e);
     db = new SQL.Database();
     initSchema(db);
+    runMigrations(db);
   }
 
   return db;
@@ -110,6 +115,50 @@ function initSchema(db: Database) {
     ('Escola', 'Saída'), 
     ('Transferência', 'Saída');
   `);
+  
+  saveDatabase(db);
+}
+
+const MIGRATIONS = [
+  {
+    name: 'migration-add-profile-image-2026-06-15-22:30:00',
+    sql: 'ALTER TABLE settings ADD COLUMN profileImage TEXT;'
+  }
+];
+
+function runMigrations(db: Database) {
+  // 1. Create migrations table if not exists
+  db.run(`
+    CREATE TABLE IF NOT EXISTS migrations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      executed_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+  `);
+
+  // 2. Check for Baseline (migracao-primaria)
+  const baselineCheck = db.exec("SELECT name FROM migrations WHERE name = 'migracao-primaria'");
+  if (baselineCheck.length === 0) {
+    // If accounts table exists, it means it's an existing DB, so we register the baseline
+    const tablesCheck = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='accounts'");
+    if (tablesCheck.length > 0) {
+      db.run("INSERT INTO migrations (name) VALUES ('migracao-primaria')");
+    }
+  }
+
+  // 3. Run pending migrations
+  for (const migration of MIGRATIONS) {
+    const check = db.exec("SELECT id FROM migrations WHERE name = ?", [migration.name]);
+    if (check.length === 0) {
+      try {
+        db.run(migration.sql);
+        db.run("INSERT INTO migrations (name) VALUES (?)", [migration.name]);
+        console.log(`Migration applied: ${migration.name}`);
+      } catch (e) {
+        console.error(`Error applying migration ${migration.name}:`, e);
+      }
+    }
+  }
   
   saveDatabase(db);
 }

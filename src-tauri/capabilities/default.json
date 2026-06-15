@@ -20,6 +20,7 @@
       "identifier": "fs:allow-mkdir",
       "allow": [{ "path": "$APPDATA/**" }]
     },
-    "dialog:default"
+    "dialog:default",
+    "updater:default"
   ]
 }

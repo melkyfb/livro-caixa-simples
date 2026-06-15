@@ -3,6 +3,7 @@ import { Layout } from '@/components/Layout'
 import { getDatabase } from '@/lib/database'
 import { DashboardView } from '@/components/DashboardView'
 import { TransactionsView } from '@/components/TransactionsView'
+import { ProfileView } from '@/components/ProfileView'
 import { SettingsView } from '@/components/SettingsView'
 import { ReportsView } from '@/components/ReportsView'
 import { Toaster } from '@/components/ui/toaster'
@@ -32,6 +33,7 @@ function App() {
     <>
       <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
         {activeTab === 'dashboard' && <DashboardView />}
+        {activeTab === 'profile' && <ProfileView />}
         {activeTab === 'transactions' && <TransactionsView />}
         {activeTab === 'reports' && <ReportsView />}
         {activeTab === 'settings' && <SettingsView />}

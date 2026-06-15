@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { getDatabase, saveDatabase, exportDatabase, importDatabase, deleteDatabaseFile } from '@/lib/database';
-import type { Settings, CustomField, Category, CategoryType, Account, AccountType, SignatureField } from '@/types/index';
+import type { Settings, Category, CategoryType, Account, AccountType, SignatureField } from '@/types/index';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTheme } from '@/components/theme-provider';
 import { 
-  Building2, Church, User, Plus, Trash2, Tag, AlertTriangle, Wallet, Landmark, 
-  Upload, Download, Monitor, ChevronRight, Printer
+  User, Plus, Trash2, Tag, AlertTriangle, Wallet, Landmark, 
+  Upload, Download, Monitor, ChevronRight, Printer, Settings as SettingsIcon, RefreshCw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -25,7 +25,6 @@ export const SettingsView = () => {
     id: 1, entityName: '', entityType: 'Empresa', country: 'Brasil', currency: 'BRL',
     customFieldsSchema: '[]', printSettings: '{"showSignatures": true, "signatures": []}'
   });
-  const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [showSignatures, setShowSignatures] = useState(true);
   const [signatures, setSignatures] = useState<SignatureField[]>([]);
   
@@ -35,7 +34,6 @@ export const SettingsView = () => {
   const [categoryCounts, setCategoryCounts] = useState<Record<number, number>>({});
 
   // Dialogs Open States
-  const [isEntityOpen, setIsEntityOpen] = useState(false);
   const [isAccountsOpen, setIsAccountsOpen] = useState(false);
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
   const [isDeleteDatabaseDialogOpen, setIsDeleteDatabaseDialogOpen] = useState(false);
@@ -72,7 +70,6 @@ export const SettingsView = () => {
         printSettings: printStr
       });
       
-      try { setCustomFields(JSON.parse(schema)); } catch (e) { setCustomFields([]); }
       try {
         const p = JSON.parse(printStr);
         setShowSignatures(p.showSignatures ?? true);
@@ -114,28 +111,48 @@ export const SettingsView = () => {
     }
   };
 
-  const handleSaveSettings = async () => {
+  const handleQuickSave = async (updatedSettings: Settings) => {
     const db = await getDatabase();
-    const result = db.exec("SELECT id FROM settings LIMIT 1");
-    const schema = JSON.stringify(customFields);
-    const printSchema = JSON.stringify({ showSignatures, signatures });
-    
-    setSettings(prev => ({ ...prev, customFieldsSchema: schema, printSettings: printSchema }));
-
-    if (result.length > 0) {
-      db.run(
-        "UPDATE settings SET entityName = ?, entityType = ?, country = ?, currency = ?, customFieldsSchema = ?, printSettings = ? WHERE id = ?",
-        [settings.entityName, settings.entityType, settings.country, settings.currency, schema, printSchema, settings.id]
-      );
-    } else {
-      db.run(
-        "INSERT INTO settings (entityName, entityType, country, currency, customFieldsSchema, printSettings) VALUES (?, ?, ?, ?, ?, ?)",
-        [settings.entityName, settings.entityType, settings.country, settings.currency, schema, printSchema]
-      );
-    }
-    
+    db.run(
+      "UPDATE settings SET currency = ? WHERE id = ?",
+      [updatedSettings.currency, updatedSettings.id]
+    );
     saveDatabase(db);
-    toast({ title: "Configurações salvas" });
+    toast({ title: "Moeda atualizada" });
+  };
+
+  const handleToggleSignatures = async (value: boolean) => {
+    setShowSignatures(value);
+    const db = await getDatabase();
+    const printSchema = JSON.stringify({ showSignatures: value, signatures });
+    db.run("UPDATE settings SET printSettings = ? WHERE id = ?", [printSchema, settings.id]);
+    saveDatabase(db);
+    toast({ title: value ? "Assinaturas ativadas" : "Assinaturas desativadas" });
+  };
+
+  const handleAddSignature = () => {
+    setSignatures([...signatures, { label: '', name: '' }]);
+  };
+
+  const handleRemoveSignature = (index: number) => {
+    const newSigs = signatures.filter((_, i) => i !== index);
+    setSignatures(newSigs);
+    handleSaveSignatures(newSigs);
+  };
+
+  const handleUpdateSignature = (index: number, key: 'label' | 'name', val: string) => {
+    const newSigs = [...signatures];
+    newSigs[index][key] = val;
+    setSignatures(newSigs);
+  };
+
+  const handleSaveSignatures = async (sigsToSave?: SignatureField[]) => {
+    const targetSigs = sigsToSave || signatures;
+    const db = await getDatabase();
+    const printSchema = JSON.stringify({ showSignatures, signatures: targetSigs });
+    db.run("UPDATE settings SET printSettings = ? WHERE id = ?", [printSchema, settings.id]);
+    saveDatabase(db);
+    toast({ title: "Assinaturas atualizadas" });
   };
 
   const handleExport = async () => {
@@ -194,23 +211,17 @@ export const SettingsView = () => {
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-12">
       
-      {/* Header Profile */}
+      {/* Header Settings */}
       <div className="glass-panel p-6 rounded-2xl flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-full bg-primary/20 text-primary flex items-center justify-center text-2xl shadow-inner">
-            {settings.entityType === 'Empresa' ? <Building2 /> : settings.entityType === 'Igreja' ? <Church /> : <User />}
+            <SettingsIcon className="w-8 h-8 animate-spin-slow" />
           </div>
           <div>
-            <h2 className="text-2xl font-bold tracking-tight">{settings.entityName || 'Sua Entidade'}</h2>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" /> Ativo
-              </span>
-              <span className="text-sm text-muted-foreground">{settings.entityType}</span>
-            </div>
+            <h2 className="text-2xl font-bold tracking-tight">Configurações do Sistema</h2>
+            <p className="text-sm text-muted-foreground mt-1">Gerencie suas contas, categorias e preferências técnicas.</p>
           </div>
         </div>
-        <Button variant="outline" className="hidden sm:flex" onClick={() => setIsEntityOpen(true)}>Editar Perfil</Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -221,17 +232,9 @@ export const SettingsView = () => {
           {/* Menu Lateral / Configurações da Entidade */}
           <div className="glass-panel rounded-2xl overflow-hidden">
             <div className="p-4 border-b border-white/5 bg-black/5 dark:bg-white/5">
-              <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Entidade e Contas</h3>
+              <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Contas e Categorias</h3>
             </div>
             <div className="p-2 space-y-1">
-              <button onClick={() => setIsEntityOpen(true)} className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-secondary/50 transition-colors text-left group">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-primary/10 text-primary"><User className="w-4 h-4" /></div>
-                  <span className="font-medium">Perfil e Moeda</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              </button>
-              
               <button onClick={() => setIsAccountsOpen(true)} className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-secondary/50 transition-colors text-left group">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-md bg-blue-500/10 text-blue-500"><Landmark className="w-4 h-4" /></div>
@@ -281,6 +284,38 @@ export const SettingsView = () => {
               </button>
             </div>
           </div>
+
+          {/* Software Info & Updates */}
+          <div className="glass-panel rounded-2xl overflow-hidden">
+            <div className="p-4 border-b border-white/5 bg-black/5 dark:bg-white/5">
+              <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Software</h3>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-md bg-primary/10 text-primary"><RefreshCw className="w-4 h-4" /></div>
+                  <div>
+                    <span className="font-medium block text-sm">Atualizações</span>
+                    <span className="text-[10px] text-muted-foreground">Verificar nova versão no GitHub</span>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={async () => {
+                  try {
+                    const { check } = await import('@tauri-apps/plugin-updater');
+                    const update = await check();
+                    if (update) {
+                      toast({ title: "Nova versão disponível!", description: `Versão ${update.version} encontrada.` });
+                      await update.downloadAndInstall();
+                    } else {
+                      toast({ title: "Você já está na versão mais recente." });
+                    }
+                  } catch (e) {
+                    toast({ title: "Erro ao verificar atualizações", variant: "destructive" });
+                  }
+                }}>Verificar</Button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Right Column */}
@@ -317,8 +352,53 @@ export const SettingsView = () => {
                 </div>
                 <ToggleSwitch 
                   checked={showSignatures} 
-                  onChange={(v) => { setShowSignatures(v); handleSaveSettings(); }} 
+                  onChange={handleToggleSignatures} 
                 />
+              </div>
+
+              {/* Gerenciar Assinaturas */}
+              <div className="space-y-4 pt-4 border-t border-white/5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-md bg-primary/10 text-primary"><User className="w-4 h-4" /></div>
+                    <span className="font-medium">Assinaturas do Relatório</span>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={handleAddSignature} className="text-primary hover:bg-primary/10">
+                    <Plus className="w-4 h-4 mr-1" /> Add
+                  </Button>
+                </div>
+                <div className="space-y-3">
+                  {signatures.map((sig, i) => (
+                    <div key={i} className="flex gap-2 items-end group animate-in slide-in-from-right-2 duration-300">
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-[10px] uppercase text-muted-foreground">Cargo/Rótulo</Label>
+                        <Input 
+                          placeholder="Ex: Tesoureiro" 
+                          className="h-8 text-xs bg-background/50" 
+                          value={sig.label} 
+                          onChange={(e) => handleUpdateSignature(i, 'label', e.target.value)}
+                          onBlur={() => handleSaveSignatures()}
+                        />
+                      </div>
+                      <div className="flex-[1.5] space-y-1">
+                        <Label className="text-[10px] uppercase text-muted-foreground">Nome</Label>
+                        <Input 
+                          placeholder="Nome Completo" 
+                          className="h-8 text-xs bg-background/50" 
+                          value={sig.name} 
+                          onChange={(e) => handleUpdateSignature(i, 'name', e.target.value)}
+                          onBlur={() => handleSaveSignatures()}
+                        />
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => handleRemoveSignature(i)}>
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                  {signatures.length === 0 && (
+                    <p className="text-[10px] text-muted-foreground italic text-center py-2">Nenhuma assinatura configurada.</p>
+                  )}
+                </div>
               </div>
 
               {/* Moeda Exibição */}
@@ -327,7 +407,26 @@ export const SettingsView = () => {
                   <div className="p-2 rounded-md bg-primary/10 text-primary"><span className="w-4 h-4 flex items-center justify-center font-bold">$</span></div>
                   <span className="font-medium">Moeda Padrão</span>
                 </div>
-                <span className="font-mono text-sm bg-secondary px-2 py-1 rounded text-muted-foreground">{settings.currency}</span>
+                <Select 
+                  value={settings.currency} 
+                  onValueChange={(v) => {
+                    const newSettings = {...settings, currency: v};
+                    setSettings(newSettings);
+                    // Trigger save immediately for better UX
+                    handleQuickSave(newSettings);
+                  }}
+                >
+                  <SelectTrigger className="w-[100px] bg-secondary border-none h-8 font-mono text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="glass-panel border-none">
+                    <SelectItem value="BRL">BRL (R$)</SelectItem>
+                    <SelectItem value="EUR">EUR (€)</SelectItem>
+                    <SelectItem value="USD">USD ($)</SelectItem>
+                    <SelectItem value="GBP">GBP (£)</SelectItem>
+                    <SelectItem value="JPY">JPY (¥)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
             </div>
@@ -339,34 +438,6 @@ export const SettingsView = () => {
 
       {/* DIALOGS */}
       
-      {/* Dialog Entidade */}
-      <Dialog open={isEntityOpen} onOpenChange={setIsEntityOpen}>
-        <DialogContent className="glass-panel border-none sm:max-w-[500px]">
-          <DialogHeader><DialogTitle>Editar Perfil</DialogTitle></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Nome da Entidade</Label>
-              <Input className="bg-background/50" value={settings.entityName} onChange={(e) => setSettings({...settings, entityName: e.target.value})} />
-            </div>
-            <div className="space-y-2">
-              <Label>Tipo</Label>
-              <Select value={settings.entityType} onValueChange={(v) => setSettings({...settings, entityType: v as any})}>
-                <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Empresa">Empresa</SelectItem>
-                  <SelectItem value="Igreja">Igreja / ONG</SelectItem>
-                  <SelectItem value="Pessoal">Pessoal</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEntityOpen(false)}>Cancelar</Button>
-            <Button onClick={() => { handleSaveSettings(); setIsEntityOpen(false); }}>Salvar Alterações</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Dialog Contas */}
       <Dialog open={isAccountsOpen} onOpenChange={setIsAccountsOpen}>
         <DialogContent className="glass-panel border-none sm:max-w-[600px]">

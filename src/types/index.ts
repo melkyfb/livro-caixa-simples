@@ -39,6 +39,7 @@ export interface Settings {
   entityType: 'Empresa' | 'Igreja' | 'Pessoal';
   country: string;
   currency: string;
+  profileImage?: string;
   customFieldsSchema?: string;
   printSettings?: string; // JSON: { showSignatures: boolean, signatures: SignatureField[] }
 }
