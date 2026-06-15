@@ -43,3 +43,4 @@ jobs:
           releaseBody: "Novo release gerado automaticamente."
           releaseDraft: false
           prerelease: false
+          includeUpdaterJson: true
