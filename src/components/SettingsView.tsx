@@ -7,9 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTheme } from '@/components/theme-provider';
 import { 
-  Building2, Church, User, Plus, Trash2, Tag, 
-  ShieldCheck, AlertTriangle, Pencil, Wallet, Landmark, 
-  Upload, Download, Moon, Sun, Monitor, ChevronRight, Check, Printer
+  Building2, Church, User, Plus, Trash2, Tag, AlertTriangle, Wallet, Landmark, 
+  Upload, Download, Monitor, ChevronRight, Printer
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
