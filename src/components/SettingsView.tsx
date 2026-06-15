@@ -2,70 +2,52 @@ import { useState, useEffect } from 'react';
 import { getDatabase, saveDatabase, exportDatabase, importDatabase, deleteDatabaseFile } from '@/lib/database';
 import type { Settings, CustomField, Category, CategoryType, Account, AccountType, SignatureField } from '@/types/index';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useTheme } from '@/components/theme-provider';
 import { 
-  Save, Building2, Church, User, Plus, Trash2, Tag, 
-  Settings as SettingsIcon, ShieldCheck, AlertTriangle, Pencil,
-  Wallet, Landmark, Upload, Download
+  Building2, Church, User, Plus, Trash2, Tag, 
+  ShieldCheck, AlertTriangle, Pencil, Wallet, Landmark, 
+  Upload, Download, Moon, Sun, Monitor, ChevronRight, Check, Printer
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
 
 export const SettingsView = () => {
   const { toast } = useToast();
-  const [activeSettingsTab, setActiveSettingsTab] = useState('entity');
+  const { theme, setTheme } = useTheme();
   
-  // Entity State
+  // States
   const [settings, setSettings] = useState<Settings>({
-    id: 1,
-    entityName: '',
-    entityType: 'Empresa',
-    country: 'Brasil',
-    currency: 'BRL',
-    customFieldsSchema: '[]',
-    printSettings: '{"showSignatures": true, "signatures": []}'
+    id: 1, entityName: '', entityType: 'Empresa', country: 'Brasil', currency: 'BRL',
+    customFieldsSchema: '[]', printSettings: '{"showSignatures": true, "signatures": []}'
   });
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
-  
-  // Print State
   const [showSignatures, setShowSignatures] = useState(true);
   const [signatures, setSignatures] = useState<SignatureField[]>([]);
-
-  // Category State
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [categoryCounts, setCategoryCounts] = useState<Record<number, number>>({});
-  const [newCatName, setNewCatName] = useState('');
-  const [catTab, setCatTab] = useState<CategoryType>('Entrada');
   
-  // Account State
+  // Categorias & Contas states
+  const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [categoryCounts, setCategoryCounts] = useState<Record<number, number>>({});
+
+  // Dialogs Open States
+  const [isEntityOpen, setIsEntityOpen] = useState(false);
+  const [isAccountsOpen, setIsAccountsOpen] = useState(false);
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
+  const [isDeleteDatabaseDialogOpen, setIsDeleteDatabaseDialogOpen] = useState(false);
+
+  // Formulário Entidade/Contas/Categorias temporários
   const [accountName, setAccountName] = useState('');
   const [accountType, setAccountType] = useState<AccountType>('Local');
   const [initialBalance, setInitialBalance] = useState('0');
-
-  // Delete Database Dialog State
-  const [isDeleteDatabaseDialogOpen, setIsDeleteDatabaseDialogOpen] = useState(false);
-
-  // Dialog State
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
-  const [migrationCategoryId, setMigrationCategoryId] = useState<string>('');
   
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [categoryToEdit, setCategoryToEdit] = useState<Category | null>(null);
-  const [editCatName, setEditCatName] = useState('');
+  const [newCatName, setNewCatName] = useState('');
+  const [catTab, setCatTab] = useState<CategoryType>('Entrada');
 
   useEffect(() => {
     loadSettings();
@@ -111,17 +93,12 @@ export const SettingsView = () => {
     if (catResult.length > 0) {
       const rows = catResult[0].values;
       setCategories(rows.map(row => ({
-        id: row[0] as number,
-        name: row[1] as string,
-        type: row[2] as CategoryType,
+        id: row[0] as number, name: row[1] as string, type: row[2] as CategoryType,
       })));
     }
-
     const counts: Record<number, number> = {};
     if (countsResult.length > 0) {
-      countsResult[0].values.forEach(row => {
-        counts[row[0] as number] = row[1] as number;
-      });
+      countsResult[0].values.forEach(row => { counts[row[0] as number] = row[1] as number; });
     }
     setCategoryCounts(counts);
   };
@@ -132,11 +109,8 @@ export const SettingsView = () => {
     if (result.length > 0) {
       const rows = result[0].values;
       setAccounts(rows.map(row => ({
-        id: row[0] as number,
-        name: row[1] as string,
-        type: row[2] as AccountType,
-        initialBalance: row[3] as number,
-        currentBalance: row[4] as number,
+        id: row[0] as number, name: row[1] as string, type: row[2] as AccountType,
+        initialBalance: row[3] as number, currentBalance: row[4] as number,
       })));
     }
   };
@@ -147,12 +121,7 @@ export const SettingsView = () => {
     const schema = JSON.stringify(customFields);
     const printSchema = JSON.stringify({ showSignatures, signatures });
     
-    // Atualizar o objeto local settings para que as mudanças reflitam em outras partes
-    setSettings(prev => ({
-      ...prev,
-      customFieldsSchema: schema,
-      printSettings: printSchema
-    }));
+    setSettings(prev => ({ ...prev, customFieldsSchema: schema, printSettings: printSchema }));
 
     if (result.length > 0) {
       db.run(
@@ -170,14 +139,26 @@ export const SettingsView = () => {
     toast({ title: "Configurações salvas" });
   };
 
-  const handleAddCategory = async () => {
-    if (!newCatName.trim()) return;
-    const db = await getDatabase();
-    db.run("INSERT INTO categories (name, type) VALUES (?, ?)", [newCatName, catTab]);
-    saveDatabase(db);
-    setNewCatName('');
-    loadCategories();
-    toast({ title: "Categoria adicionada" });
+  const handleExport = async () => {
+    try {
+      const success = await exportDatabase();
+      if (success) toast({ title: "Banco exportado com sucesso!" });
+    } catch (e) { toast({ title: "Erro ao exportar", variant: "destructive" }); }
+  };
+
+  const handleImport = async () => {
+    try {
+      const success = await importDatabase();
+      if (success) {
+        toast({ title: "Banco importado" });
+        setTimeout(() => window.location.reload(), 1000);
+      }
+    } catch (e) { toast({ title: "Erro ao importar", variant: "destructive" }); }
+  };
+
+  const deleteDatabase = async () => {
+    await deleteDatabaseFile();
+    window.location.reload();
   };
 
   const handleAddAccount = async () => {
@@ -189,430 +170,276 @@ export const SettingsView = () => {
       [accountName, accountType, balance, balance]
     );
     saveDatabase(db);
-    setAccountName('');
-    setInitialBalance('0');
-    loadAccounts();
+    setAccountName(''); setInitialBalance('0'); loadAccounts();
     toast({ title: "Conta adicionada" });
   };
 
-  const openDeleteDialog = (category: Category) => {
-    if (category.name === 'Diversos') {
-      toast({ 
-        title: "Ação bloqueada", 
-        description: "A categoria 'Diversos' é obrigatória e não pode ser excluída.",
-        variant: "destructive"
-      });
-      return;
-    }
-    setCategoryToDelete(category);
-    setMigrationCategoryId('');
-    setIsDeleteDialogOpen(true);
-  };
-
-  const confirmDeleteCategory = async () => {
-    if (!categoryToDelete) return;
+  const handleAddCategory = async () => {
+    if (!newCatName.trim()) return;
     const db = await getDatabase();
-    const count = categoryCounts[categoryToDelete.id] || 0;
-
-    if (count > 0) {
-      if (!migrationCategoryId) {
-        toast({ title: "Erro", description: "Selecione uma categoria de destino para as movimentações.", variant: "destructive" });
-        return;
-      }
-      db.run("UPDATE transactions SET categoryId = ? WHERE categoryId = ?", [migrationCategoryId, categoryToDelete.id]);
-    }
-
-    db.run("DELETE FROM categories WHERE id = ?", [categoryToDelete.id]);
+    db.run("INSERT INTO categories (name, type) VALUES (?, ?)", [newCatName, catTab]);
     saveDatabase(db);
-    setIsDeleteDialogOpen(false);
-    loadCategories();
-    toast({ title: "Categoria excluída", description: count > 0 ? "Movimentações migradas com sucesso." : "" });
+    setNewCatName(''); loadCategories();
+    toast({ title: "Categoria adicionada" });
   };
 
-  const openEditDialog = (category: Category) => {
-    if (category.name === 'Diversos') {
-      toast({ 
-        title: "Ação bloqueada", 
-        description: "A categoria 'Diversos' não pode ser renomeada.",
-        variant: "destructive"
-      });
-      return;
-    }
-    setCategoryToEdit(category);
-    setEditCatName(category.name);
-    setIsEditDialogOpen(true);
-  };
-
-  const confirmEditCategory = async () => {
-    if (!categoryToEdit || !editCatName.trim()) return;
-    const db = await getDatabase();
-    db.run("UPDATE categories SET name = ? WHERE id = ?", [editCatName, categoryToEdit.id]);
-    saveDatabase(db);
-    setIsEditDialogOpen(false);
-    loadCategories();
-    toast({ title: "Categoria atualizada" });
-  };
-
-  const deleteDatabase = async () => {
-    await deleteDatabaseFile();
-    window.location.reload();
-  };
-
-  const handleExport = async () => {
-    try {
-      const success = await exportDatabase();
-      if (success) toast({ title: "Banco de dados exportado com sucesso" });
-    } catch (e) {
-      toast({ title: "Erro ao exportar", description: String(e), variant: "destructive" });
-    }
-  };
-
-  const handleImport = async () => {
-    try {
-      const success = await importDatabase();
-      if (success) {
-        toast({ title: "Banco de dados importado" });
-        setTimeout(() => window.location.reload(), 1000);
-      }
-    } catch (e) {
-      toast({ title: "Erro ao importar", description: String(e), variant: "destructive" });
-    }
-  };
+  const ToggleSwitch = ({ checked, onChange }: { checked: boolean, onChange: (v: boolean) => void }) => (
+    <div 
+      className={cn("w-12 h-6 rounded-full p-1 cursor-pointer transition-colors duration-300 relative", checked ? "bg-primary" : "bg-muted")}
+      onClick={() => onChange(!checked)}
+    >
+      <div className={cn("w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-300", checked ? "translate-x-6" : "translate-x-0")} />
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <SettingsIcon className="h-6 w-6" />
-        <h3 className="text-2xl font-bold">Configurações</h3>
+    <div className="space-y-6 max-w-4xl mx-auto pb-12">
+      
+      {/* Header Profile */}
+      <div className="glass-panel p-6 rounded-2xl flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-primary/20 text-primary flex items-center justify-center text-2xl shadow-inner">
+            {settings.entityType === 'Empresa' ? <Building2 /> : settings.entityType === 'Igreja' ? <Church /> : <User />}
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">{settings.entityName || 'Sua Entidade'}</h2>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" /> Ativo
+              </span>
+              <span className="text-sm text-muted-foreground">{settings.entityType}</span>
+            </div>
+          </div>
+        </div>
+        <Button variant="outline" className="hidden sm:flex" onClick={() => setIsEntityOpen(true)}>Editar Perfil</Button>
       </div>
 
-      <Tabs value={activeSettingsTab} onValueChange={setActiveSettingsTab}>
-        <TabsList className="mb-4">
-          <TabsTrigger value="entity">Entidade</TabsTrigger>
-          <TabsTrigger value="accounts">Contas</TabsTrigger>
-          <TabsTrigger value="customization">Categorias</TabsTrigger>
-          <TabsTrigger value="print">Impressão</TabsTrigger>
-          <TabsTrigger value="danger" className="text-destructive">Perigo</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="entity" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader><CardTitle>Dados da Entidade</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Nome da Entidade</Label>
-                  <Input value={settings.entityName} onChange={(e) => setSettings({...settings, entityName: e.target.value})} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Tipo</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[{ id: 'Empresa', icon: Building2 }, { id: 'Igreja', icon: Church }, { id: 'Pessoal', icon: User }].map((type) => (
-                      <Button
-                        key={type.id}
-                        variant={settings.entityType === type.id ? "default" : "outline"}
-                        className="flex flex-col h-16 gap-1"
-                        onClick={() => setSettings({...settings, entityType: type.id as any})}
-                      >
-                        <type.icon className="h-4 w-4" />
-                        <span className="text-[10px] uppercase">{type.id}</span>
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-                <Button className="w-full" onClick={handleSaveSettings}><Save className="mr-2 h-4 w-4" /> Salvar</Button>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader><CardTitle>Campos Adicionais</CardTitle><CardDescription>Máximo 5 campos.</CardDescription></CardHeader>
-              <CardContent className="space-y-4">
-                {customFields.map((field, index) => (
-                  <div key={index} className="flex gap-2 items-center">
-                    <Input placeholder="Rótulo" className="flex-1" value={field.label} onChange={(e) => {
-                      const newFields = [...customFields];
-                      newFields[index].label = e.target.value;
-                      setCustomFields(newFields);
-                    }} />
-                    <Input placeholder="Valor" className="flex-[2]" value={field.value} onChange={(e) => {
-                      const newFields = [...customFields];
-                      newFields[index].value = e.target.value;
-                      setCustomFields(newFields);
-                    }} />
-                    <Button variant="ghost" size="icon" onClick={() => {
-                      const newFields = [...customFields];
-                      newFields.splice(index, 1);
-                      setCustomFields(newFields);
-                    }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                  </div>
-                ))}
-                {customFields.length < 5 && (
-                  <Button variant="outline" className="w-full border-dashed" onClick={() => setCustomFields([...customFields, { label: '', value: '' }])}>
-                    <Plus className="h-4 w-4 mr-2" /> Adicionar Campo
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="accounts" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="md:col-span-1">
-              <CardHeader><CardTitle>Nova Conta</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Nome</Label>
-                  <Input value={accountName} onChange={(e) => setAccountName(e.target.value)} placeholder="Ex: Banco do Brasil" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Tipo</Label>
-                  <Select value={accountType} onValueChange={(v: AccountType) => setAccountType(v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Banco">Banco</SelectItem>
-                      <SelectItem value="Local">Local (Dinheiro)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Saldo Inicial</Label>
-                  <Input type="number" value={initialBalance} onChange={(e) => setInitialBalance(e.target.value)} />
-                </div>
-                <Button className="w-full" onClick={handleAddAccount}><Plus className="mr-2 h-4 w-4" /> Adicionar</Button>
-              </CardContent>
-            </Card>
-
-            <Card className="md:col-span-2">
-              <CardHeader><CardTitle>Minhas Contas</CardTitle></CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {accounts.map((acc) => (
-                    <div key={acc.id} className="border rounded-lg overflow-hidden flex flex-col">
-                      <div className={cn("h-1 w-full", acc.type === 'Banco' ? "bg-blue-500" : "bg-orange-500")} />
-                      <div className="p-4 flex items-center gap-3">
-                        <div className="p-2 bg-secondary rounded-full">
-                          {acc.type === 'Banco' ? <Landmark className="h-4 w-4" /> : <Wallet className="h-4 w-4" />}
-                        </div>
-                        <div className="flex-1">
-                          <p className="font-semibold text-sm">{acc.name}</p>
-                          <p className="text-xs text-muted-foreground">{acc.type}</p>
-                          <p className="font-bold text-lg mt-1">
-                            {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'EUR' }).format(acc.currentBalance)}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="customization" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="md:col-span-1">
-              <CardHeader><CardTitle>Nova Categoria</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Nome</Label>
-                  <Input value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder="Ex: Combustível" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Tipo</Label>
-                  <Tabs value={catTab} onValueChange={(v) => setCatTab(v as CategoryType)}>
-                    <TabsList className="w-full">
-                      <TabsTrigger value="Entrada" className="flex-1">Entrada</TabsTrigger>
-                      <TabsTrigger value="Saída" className="flex-1">Saída</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </div>
-                <Button className="w-full" onClick={handleAddCategory}><Plus className="mr-2 h-4 w-4" /> Adicionar</Button>
-              </CardContent>
-            </Card>
-
-            <Card className="md:col-span-2">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle>Categorias de {catTab}</CardTitle>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground"><ShieldCheck className="h-3 w-3" /> Protegido</div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 max-h-[400px] overflow-auto pr-2">
-                  {categories.filter(c => c.type === catTab).map((cat) => (
-                    <div key={cat.id} className="flex items-center justify-between p-3 border rounded-md group hover:bg-secondary/10 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <Tag className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium text-sm flex items-center gap-2">
-                            {cat.name}
-                            {cat.name === 'Diversos' && <ShieldCheck className="h-3 w-3 text-blue-500" />}
-                          </p>
-                          {categoryCounts[cat.id] > 0 && <p className="text-[10px] text-muted-foreground">{categoryCounts[cat.id]} movimentações</p>}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(cat)}><Pencil className="h-4 w-4" /></Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => openDeleteDialog(cat)}><Trash2 className="h-4 w-4" /></Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="print" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="md:col-span-1">
-              <CardHeader><CardTitle>Opções de Impressão</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-2 border rounded-md">
-                  <Label className="cursor-pointer" htmlFor="show-sig">Exibir Assinaturas</Label>
-                  <input id="show-sig" type="checkbox" checked={showSignatures} onChange={(e) => setShowSignatures(e.target.checked)} className="h-4 w-4" />
-                </div>
-                <Button className="w-full" onClick={handleSaveSettings}><Save className="mr-2 h-4 w-4" /> Salvar</Button>
-              </CardContent>
-            </Card>
-
-            <Card className="md:col-span-2">
-              <CardHeader>
-                <CardTitle>Configurar Rodapé (Assinaturas)</CardTitle>
-                <CardDescription>Até 10 campos para assinatura.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {signatures.map((sig, index) => (
-                  <div key={index} className="flex gap-2 items-end border p-3 rounded-md bg-secondary/10">
-                    <div className="flex-1 space-y-2">
-                      <Label className="text-[10px] uppercase">Cargo / Título</Label>
-                      <Input placeholder="Ex: Tesoreiro" value={sig.label} onChange={(e) => {
-                        const newSigs = [...signatures];
-                        newSigs[index].label = e.target.value;
-                        setSignatures(newSigs);
-                      }} />
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <Label className="text-[10px] uppercase">Nome (Opcional)</Label>
-                      <Input placeholder="Nome completo" value={sig.name} onChange={(e) => {
-                        const newSigs = [...signatures];
-                        newSigs[index].name = e.target.value;
-                        setSignatures(newSigs);
-                      }} />
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={() => {
-                      const newSigs = [...signatures];
-                      newSigs.splice(index, 1);
-                      setSignatures(newSigs);
-                    }}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                  </div>
-                ))}
-                {signatures.length < 10 && (
-                  <Button variant="outline" className="w-full border-dashed" onClick={() => setSignatures([...signatures, { label: '', name: '' }])}>
-                    <Plus className="h-4 w-4 mr-2" /> Adicionar Assinatura
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-        <TabsContent value="danger" className="space-y-6">
-          <Card>
-            <CardHeader><CardTitle className="flex items-center gap-2"><SettingsIcon className="h-4 w-4" /> Backup do Banco de Dados</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">Você pode exportar seu banco de dados atual para um arquivo de segurança, ou restaurar um backup previamente salvo.</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Button variant="outline" className="w-full" onClick={handleExport}>
-                  <Download className="mr-2 h-4 w-4" /> Exportar Banco de Dados
-                </Button>
-                <Button variant="outline" className="w-full" onClick={handleImport}>
-                  <Upload className="mr-2 h-4 w-4" /> Importar Banco de Dados
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        
+        {/* Left Column */}
+        <div className="space-y-6">
           
-          <Card className="border-destructive border">
-            <CardHeader><CardTitle className="flex items-center gap-2 text-destructive"><AlertTriangle className="h-4 w-4" /> Perigo</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">Cuidado ao usar as opções abaixo. Elas podem causar perda de dados ou danos irreversíveis ao seu banco de dados.</p>
-              <Button variant="destructive" className="w-full" onClick={() => setIsDeleteDatabaseDialogOpen(true)}>
-                <Trash2 className="mr-2 h-4 w-4" /> Excluir Banco de Dados
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          {/* Menu Lateral / Configurações da Entidade */}
+          <div className="glass-panel rounded-2xl overflow-hidden">
+            <div className="p-4 border-b border-white/5 bg-black/5 dark:bg-white/5">
+              <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Entidade e Contas</h3>
+            </div>
+            <div className="p-2 space-y-1">
+              <button onClick={() => setIsEntityOpen(true)} className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-secondary/50 transition-colors text-left group">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-md bg-primary/10 text-primary"><User className="w-4 h-4" /></div>
+                  <span className="font-medium">Perfil e Moeda</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </button>
+              
+              <button onClick={() => setIsAccountsOpen(true)} className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-secondary/50 transition-colors text-left group">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-md bg-blue-500/10 text-blue-500"><Landmark className="w-4 h-4" /></div>
+                  <span className="font-medium">Contas e Bancos</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </button>
 
+              <button onClick={() => setIsCategoriesOpen(true)} className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-secondary/50 transition-colors text-left group">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-md bg-amber-500/10 text-amber-500"><Tag className="w-4 h-4" /></div>
+                  <span className="font-medium">Categorias</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </button>
+            </div>
+          </div>
+
+          {/* Segurança e Dados */}
+          <div className="glass-panel rounded-2xl overflow-hidden">
+            <div className="p-4 border-b border-white/5 bg-black/5 dark:bg-white/5">
+              <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Dados e Transações</h3>
+            </div>
+            <div className="p-2 space-y-1">
+              <button onClick={handleExport} className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-secondary/50 transition-colors text-left group">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-md bg-emerald-500/10 text-emerald-500"><Download className="w-4 h-4" /></div>
+                  <span className="font-medium">Fazer Backup (Exportar)</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </button>
+
+              <button onClick={handleImport} className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-secondary/50 transition-colors text-left group">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-md bg-purple-500/10 text-purple-500"><Upload className="w-4 h-4" /></div>
+                  <span className="font-medium">Restaurar (Importar)</span>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </button>
+              
+              <button onClick={() => setIsDeleteDatabaseDialogOpen(true)} className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-destructive/10 text-destructive transition-colors text-left group">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-md bg-destructive/10 text-destructive"><Trash2 className="w-4 h-4" /></div>
+                  <span className="font-medium">Apagar Banco de Dados</span>
+                </div>
+                <ChevronRight className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-colors" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column */}
+        <div className="space-y-6">
+          
+          {/* Preferências */}
+          <div className="glass-panel rounded-2xl overflow-hidden h-full">
+            <div className="p-4 border-b border-white/5 bg-black/5 dark:bg-white/5">
+              <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Preferências</h3>
+            </div>
+            <div className="p-4 space-y-6">
+              
+              {/* Tema */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-md bg-primary/10 text-primary"><Monitor className="w-4 h-4" /></div>
+                  <span className="font-medium">Tema do Aplicativo</span>
+                </div>
+                <div className="flex items-center bg-secondary/50 rounded-full p-1 border border-border">
+                  <button onClick={() => setTheme('dark')} className={cn("px-3 py-1 rounded-full text-xs font-medium transition-all", theme === 'dark' ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground")}>Dark</button>
+                  <button onClick={() => setTheme('light')} className={cn("px-3 py-1 rounded-full text-xs font-medium transition-all", theme === 'light' ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground")}>Light</button>
+                  <button onClick={() => setTheme('system')} className={cn("px-3 py-1 rounded-full text-xs font-medium transition-all", theme === 'system' ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground")}>Auto</button>
+                </div>
+              </div>
+
+              {/* Mostrar Assinaturas */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-md bg-primary/10 text-primary"><Printer className="w-4 h-4" /></div>
+                  <div>
+                    <span className="font-medium block">Imprimir Assinaturas</span>
+                    <span className="text-xs text-muted-foreground">Exibir assinaturas nos relatórios</span>
+                  </div>
+                </div>
+                <ToggleSwitch 
+                  checked={showSignatures} 
+                  onChange={(v) => { setShowSignatures(v); handleSaveSettings(); }} 
+                />
+              </div>
+
+              {/* Moeda Exibição */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-md bg-primary/10 text-primary"><span className="w-4 h-4 flex items-center justify-center font-bold">$</span></div>
+                  <span className="font-medium">Moeda Padrão</span>
+                </div>
+                <span className="font-mono text-sm bg-secondary px-2 py-1 rounded text-muted-foreground">{settings.currency}</span>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      {/* DIALOGS */}
+      
+      {/* Dialog Entidade */}
+      <Dialog open={isEntityOpen} onOpenChange={setIsEntityOpen}>
+        <DialogContent className="glass-panel border-none sm:max-w-[500px]">
+          <DialogHeader><DialogTitle>Editar Perfil</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nome da Entidade</Label>
+              <Input className="bg-background/50" value={settings.entityName} onChange={(e) => setSettings({...settings, entityName: e.target.value})} />
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <Select value={settings.entityType} onValueChange={(v) => setSettings({...settings, entityType: v as any})}>
+                <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Empresa">Empresa</SelectItem>
+                  <SelectItem value="Igreja">Igreja / ONG</SelectItem>
+                  <SelectItem value="Pessoal">Pessoal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEntityOpen(false)}>Cancelar</Button>
+            <Button onClick={() => { handleSaveSettings(); setIsEntityOpen(false); }}>Salvar Alterações</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Contas */}
+      <Dialog open={isAccountsOpen} onOpenChange={setIsAccountsOpen}>
+        <DialogContent className="glass-panel border-none sm:max-w-[600px]">
+          <DialogHeader><DialogTitle>Contas e Bancos Vinculados</DialogTitle></DialogHeader>
+          <div className="py-4 space-y-6">
+            <div className="flex gap-2 items-end">
+              <div className="flex-1 space-y-1"><Label className="text-xs">Nome</Label><Input className="bg-background/50" value={accountName} onChange={(e) => setAccountName(e.target.value)} /></div>
+              <div className="w-1/3 space-y-1"><Label className="text-xs">Tipo</Label>
+                <Select value={accountType} onValueChange={(v: AccountType) => setAccountType(v)}>
+                  <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="Banco">Banco</SelectItem><SelectItem value="Local">Caixa</SelectItem></SelectContent>
+                </Select>
+              </div>
+              <Button onClick={handleAddAccount} size="icon"><Plus className="w-4 h-4" /></Button>
+            </div>
+            <div className="space-y-2 max-h-[300px] overflow-auto">
+              {accounts.map(acc => (
+                <div key={acc.id} className="flex items-center justify-between p-3 rounded-lg bg-background/40 border border-border/50">
+                  <div className="flex items-center gap-3">
+                    <div className={cn("p-2 rounded-full", acc.type === 'Banco' ? "bg-blue-500/20 text-blue-500" : "bg-orange-500/20 text-orange-500")}>
+                      {acc.type === 'Banco' ? <Landmark className="w-4 h-4" /> : <Wallet className="w-4 h-4" />}
+                    </div>
+                    <div><p className="text-sm font-semibold">{acc.name}</p></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Categorias */}
+      <Dialog open={isCategoriesOpen} onOpenChange={setIsCategoriesOpen}>
+        <DialogContent className="glass-panel border-none sm:max-w-[600px]">
+          <DialogHeader><DialogTitle>Gerenciar Categorias</DialogTitle></DialogHeader>
+          <div className="py-4 space-y-6">
+            <div className="flex gap-2 items-end">
+              <div className="flex-1 space-y-1"><Label className="text-xs">Nova Categoria</Label><Input className="bg-background/50" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} /></div>
+              <div className="w-1/3 space-y-1"><Label className="text-xs">Tipo</Label>
+                <Select value={catTab} onValueChange={(v: CategoryType) => setCatTab(v)}>
+                  <SelectTrigger className="bg-background/50"><SelectValue /></SelectTrigger>
+                  <SelectContent><SelectItem value="Entrada">Entrada</SelectItem><SelectItem value="Saída">Saída</SelectItem></SelectContent>
+                </Select>
+              </div>
+              <Button onClick={handleAddCategory} size="icon"><Plus className="w-4 h-4" /></Button>
+            </div>
+            <div className="space-y-2 max-h-[300px] overflow-auto pr-2">
+              {categories.map(cat => (
+                <div key={cat.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-background/40">
+                  <span className="text-sm flex items-center gap-2">{cat.name} {cat.type === 'Entrada' ? <span className="text-[10px] text-emerald-500 bg-emerald-500/10 px-1 rounded">IN</span> : <span className="text-[10px] text-destructive bg-destructive/10 px-1 rounded">OUT</span>}</span>
+                  {categoryCounts[cat.id] > 0 && <span className="text-xs text-muted-foreground">{categoryCounts[cat.id]} transações</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Delete DB */}
       <Dialog open={isDeleteDatabaseDialogOpen} onOpenChange={setIsDeleteDatabaseDialogOpen}>
-        <DialogContent>
+        <DialogContent className="glass-panel border-destructive/30">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="text-red-500" />
-              Excluir Banco de Dados
-            </DialogTitle>
-            <DialogDescription>Tem certeza que deseja excluir todo o banco de dados? Esta ação é irreversível.</DialogDescription>
+            <DialogTitle className="flex items-center gap-2 text-destructive"><AlertTriangle /> Apagar Banco de Dados</DialogTitle>
+            <DialogDescription>Atenção! Isso removerá todas as transações, categorias e contas criadas. Não tem volta.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteDatabaseDialogOpen(false)}>Cancelar</Button>
-            <Button variant="destructive" onClick={deleteDatabase}>Confirmar Exclusão</Button>
+            <Button variant="destructive" onClick={deleteDatabase}>Sim, Apagar Tudo</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Migration / Delete Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {categoryCounts[categoryToDelete?.id || 0] > 0 ? <AlertTriangle className="text-amber-500" /> : <Trash2 />}
-              Excluir Categoria
-            </DialogTitle>
-            <DialogDescription>Tem certeza que deseja excluir <strong>{categoryToDelete?.name}</strong>?</DialogDescription>
-          </DialogHeader>
-          {categoryCounts[categoryToDelete?.id || 0] > 0 && (
-            <div className="space-y-4 py-4">
-              <div className="bg-amber-50 border border-amber-200 p-3 rounded-md text-amber-800 text-xs">
-                Esta categoria possui <strong>{categoryCounts[categoryToDelete?.id || 0]} movimentações</strong>. 
-                Para excluir, você deve migrá-las para outra categoria abaixo:
-              </div>
-              <div className="space-y-2">
-                <Label>Migrar para:</Label>
-                <Select value={migrationCategoryId} onValueChange={setMigrationCategoryId}>
-                  <SelectTrigger><SelectValue placeholder="Selecione a nova categoria" /></SelectTrigger>
-                  <SelectContent>
-                    {categories.filter(c => c.type === categoryToDelete?.type && c.id !== categoryToDelete?.id).map(c => (
-                      <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>Cancelar</Button>
-            <Button variant="destructive" onClick={confirmDeleteCategory}>Confirmar Exclusão</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Renomear Categoria</DialogTitle><DialogDescription>As movimentações existentes serão mantidas nesta categoria.</DialogDescription></DialogHeader>
-          <div className="py-4 space-y-2">
-            <Label>Novo Nome</Label>
-            <Input value={editCatName} onChange={(e) => setEditCatName(e.target.value)} />
-            {categoryCounts[categoryToEdit?.id || 0] > 0 && (
-              <p className="text-[10px] text-amber-600 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> {categoryCounts[categoryToEdit?.id || 0]} movimentações serão atualizadas.</p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={confirmEditCategory}>Salvar Alteração</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
