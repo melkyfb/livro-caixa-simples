@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getDatabase, saveDatabase } from '@/lib/database';
+import { getDatabase, saveDatabase, exportDatabase, importDatabase, deleteDatabaseFile } from '@/lib/database';
 import type { Settings, CustomField, Category, CategoryType, Account, AccountType, SignatureField } from '@/types/index';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Save, Building2, Church, User, Plus, Trash2, Tag, 
   Settings as SettingsIcon, ShieldCheck, AlertTriangle, Pencil,
-  Wallet, Landmark
+  Wallet, Landmark, Upload, Download
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -54,6 +54,9 @@ export const SettingsView = () => {
   const [accountName, setAccountName] = useState('');
   const [accountType, setAccountType] = useState<AccountType>('Local');
   const [initialBalance, setInitialBalance] = useState('0');
+
+  // Delete Database Dialog State
+  const [isDeleteDatabaseDialogOpen, setIsDeleteDatabaseDialogOpen] = useState(false);
 
   // Dialog State
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -250,6 +253,32 @@ export const SettingsView = () => {
     toast({ title: "Categoria atualizada" });
   };
 
+  const deleteDatabase = async () => {
+    await deleteDatabaseFile();
+    window.location.reload();
+  };
+
+  const handleExport = async () => {
+    try {
+      const success = await exportDatabase();
+      if (success) toast({ title: "Banco de dados exportado com sucesso" });
+    } catch (e) {
+      toast({ title: "Erro ao exportar", description: String(e), variant: "destructive" });
+    }
+  };
+
+  const handleImport = async () => {
+    try {
+      const success = await importDatabase();
+      if (success) {
+        toast({ title: "Banco de dados importado" });
+        setTimeout(() => window.location.reload(), 1000);
+      }
+    } catch (e) {
+      toast({ title: "Erro ao importar", description: String(e), variant: "destructive" });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2">
@@ -263,6 +292,7 @@ export const SettingsView = () => {
           <TabsTrigger value="accounts">Contas</TabsTrigger>
           <TabsTrigger value="customization">Categorias</TabsTrigger>
           <TabsTrigger value="print">Impressão</TabsTrigger>
+          <TabsTrigger value="danger" className="text-destructive">Perigo</TabsTrigger>
         </TabsList>
 
         <TabsContent value="entity" className="space-y-6">
@@ -486,7 +516,49 @@ export const SettingsView = () => {
             </Card>
           </div>
         </TabsContent>
+        <TabsContent value="danger" className="space-y-6">
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><SettingsIcon className="h-4 w-4" /> Backup do Banco de Dados</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">Você pode exportar seu banco de dados atual para um arquivo de segurança, ou restaurar um backup previamente salvo.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Button variant="outline" className="w-full" onClick={handleExport}>
+                  <Download className="mr-2 h-4 w-4" /> Exportar Banco de Dados
+                </Button>
+                <Button variant="outline" className="w-full" onClick={handleImport}>
+                  <Upload className="mr-2 h-4 w-4" /> Importar Banco de Dados
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-destructive border">
+            <CardHeader><CardTitle className="flex items-center gap-2 text-destructive"><AlertTriangle className="h-4 w-4" /> Perigo</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">Cuidado ao usar as opções abaixo. Elas podem causar perda de dados ou danos irreversíveis ao seu banco de dados.</p>
+              <Button variant="destructive" className="w-full" onClick={() => setIsDeleteDatabaseDialogOpen(true)}>
+                <Trash2 className="mr-2 h-4 w-4" /> Excluir Banco de Dados
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      <Dialog open={isDeleteDatabaseDialogOpen} onOpenChange={setIsDeleteDatabaseDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="text-red-500" />
+              Excluir Banco de Dados
+            </DialogTitle>
+            <DialogDescription>Tem certeza que deseja excluir todo o banco de dados? Esta ação é irreversível.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDatabaseDialogOpen(false)}>Cancelar</Button>
+            <Button variant="destructive" onClick={deleteDatabase}>Confirmar Exclusão</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Migration / Delete Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

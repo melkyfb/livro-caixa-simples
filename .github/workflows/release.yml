@@ -1,0 +1,43 @@
+name: Release Executable
+
+on:
+  push:
+    tags:
+      - 'v*' # Trigger quando uma tag começando com 'v' for criada (ex: v1.0.0)
+  workflow_dispatch: # Permite rodar manualmente pelo painel do GitHub Actions
+
+jobs:
+  release:
+    name: Build and Release Windows Executable
+    runs-on: windows-latest
+    permissions:
+      contents: write # Necessário para criar o release
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build and Release Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }} # Usa a tag que disparou o action
+          releaseName: "Livro Caixa Simples ${{ github.ref_name }}"
+          releaseBody: "Novo release gerado automaticamente."
+          releaseDraft: false
+          prerelease: false

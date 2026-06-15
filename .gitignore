@@ -25,3 +25,5 @@ dist-ssr
 
 build/**/*
 node_modules/**/*
+.gemini/
+gha-creds-*.json

@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { getVersion } from '@tauri-apps/api/app';
 import { LayoutDashboard, ArrowLeftRight, Settings, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -25,6 +26,12 @@ const SidebarItem = ({ icon: Icon, label, active, onClick }: SidebarItemProps) =
 );
 
 export const Layout = ({ children, activeTab, setActiveTab }: { children: React.ReactNode, activeTab: string, setActiveTab: (tab: string) => void }) => {
+  const [appVersion, setAppVersion] = useState('');
+
+  useEffect(() => {
+    getVersion().then(v => setAppVersion(`v${v}`)).catch(() => setAppVersion('v0.1.0'));
+  }, []);
+
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'transactions', label: 'Transações', icon: ArrowLeftRight },
@@ -52,7 +59,7 @@ export const Layout = ({ children, activeTab, setActiveTab }: { children: React.
           ))}
         </nav>
         <div className="p-4 border-t text-xs text-muted-foreground text-center">
-          v1.0.0
+          {appVersion || 'Carregando versão...'}
         </div>
       </aside>
 

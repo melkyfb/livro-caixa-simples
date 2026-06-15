@@ -1,0 +1,8 @@
+feat: migração do banco para arquivo e sincronização de versão
+
+- Adicionado Github Action de release (Windows exe)
+- Migrado armazenamento do sql.js do localStorage para arquivo físico (Tauri fs)
+- Adicionado recurso de exportar e importar banco de dados na aba Configurações > Perigo
+- Sincronizada a versão do app na interface com o binário Rust
+- Corrigidas permissões do Tauri v2 para manipulação de arquivos e dialogs
+- Atualizado package.json para refletir a versão 0.1.0

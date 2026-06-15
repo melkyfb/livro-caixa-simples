@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "livro-caixa",
+  "productName": "Livro Caixa Simples",
   "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "identifier": "com.github.melkyfb.livro-caixa-simples",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -13,10 +13,11 @@
     "windows": [
       {
         "title": "Livro Caixa Simples",
-        "width": 800,
-        "height": 600,
-        "resizable": true,
-        "fullscreen": false
+        "width": 1200,
+        "height": 900,
+        "resizable": false,
+        "fullscreen": false,
+        "maximized": true
       }
     ],
     "security": {

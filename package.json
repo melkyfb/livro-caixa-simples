@@ -1,7 +1,7 @@
 {
   "name": "livro-caixa-simples",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
   "type": "module",
   "main": "main.js",
   "scripts": {
@@ -9,8 +9,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "electron:dev": "vite && electron .",
-    "electron:build": "vite build && electron-builder"
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.16",
@@ -21,6 +21,8 @@
     "@radix-ui/react-slot": "^1.2.5",
     "@radix-ui/react-tabs": "^1.1.14",
     "@radix-ui/react-toast": "^1.2.16",
+    "@tauri-apps/plugin-dialog": "^2.7.1",
+    "@tauri-apps/plugin-fs": "^2.5.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.18.0",
@@ -40,8 +42,6 @@
     "@types/sql.js": "^1.4.11",
     "@vitejs/plugin-react": "^6.0.1",
     "autoprefixer": "^10.5.0",
-    "electron": "^42.4.0",
-    "electron-builder": "^26.15.3",
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
@@ -51,24 +51,5 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
     "vite": "^8.0.12"
-  },
-  "build": {
-    "appId": "com.github.melkyfb.livro-caixa-simples",
-    "productName": "Livro Caixa Simples",
-    "win": {
-      "target": ["nsis"]
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
-    },
-    "files": [
-      "dist/**/*",
-      "main.js",
-      "package.json"
-    ],
-    "directories": {
-      "buildResources": "build"
-    }
   }
 }
