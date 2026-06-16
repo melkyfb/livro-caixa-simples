@@ -15,6 +15,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
+import { relaunch } from '@tauri-apps/plugin-process';
 
 export const SettingsView = () => {
   const { toast } = useToast();
@@ -167,7 +168,7 @@ export const SettingsView = () => {
       const success = await importDatabase();
       if (success) {
         toast({ title: "Banco importado" });
-        setTimeout(() => window.location.reload(), 1000);
+        setTimeout(() => relaunch(), 1000);
       }
     } catch (e) { toast({ title: "Erro ao importar", variant: "destructive" }); }
   };
