@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Livro-Caixa-Simples",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "identifier": "com.github.melkyfb.livro-caixa-simples",
   "build": {
     "frontendDist": "../dist",
@@ -28,7 +28,7 @@
     "updater": {
       "active": true,
       "endpoints": [
-        "https://raw.githubusercontent.com/melkyfb/livro-caixa-simples/main/update.json"
+        "https://github.com/melkyfb/livro-caixa-simples/releases/download/{{current_version}}/latest.json"
       ],
       "dialog": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENCN0NCOUEwM0EyOUE1QgpSV1JibXFJRG1zdTNEQkJicTZ5YnhqaEhxeHZ1QWNhNzIzdk5kU1lSTFRFTUtUR0dLUWF3NzdyZwo="
@@ -36,7 +36,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["msi"],
+    "targets": "all",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
