@@ -28,7 +28,7 @@
     "updater": {
       "active": true,
       "endpoints": [
-        "https://github.com/melkyfb/livro-caixa-simples/releases/download/{{current_version}}/latest.json"
+        "https://github.com/melkyfb/livro-caixa-simples/releases/latest/download/latest.json"
       ],
       "dialog": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENCN0NCOUEwM0EyOUE1QgpSV1JibXFJRG1zdTNEQkJicTZ5YnhqaEhxeHZ1QWNhNzIzdk5kU1lSTFRFTUtUR0dLUWF3NzdyZwo="
