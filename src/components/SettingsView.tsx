@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getDatabase, saveDatabase, exportDatabase, importDatabase, deleteDatabaseFile } from '@/lib/database';
+import { apiService } from '@/lib/api';
 import type { Settings, Category, CategoryType, Account, AccountType, SignatureField } from '@/types/index';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,15 +7,14 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTheme } from '@/components/theme-provider';
 import { 
-  User, Plus, Trash2, Tag, AlertTriangle, Wallet, Landmark, 
-  Upload, Download, Monitor, ChevronRight, Printer, Settings as SettingsIcon, RefreshCw
+  Plus, Trash2, Tag, Wallet, Landmark, 
+  Monitor, ChevronRight, Printer, Settings as SettingsIcon
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from '@/lib/utils';
-import { relaunch } from '@tauri-apps/plugin-process';
 
 export const SettingsView = () => {
   const { toast } = useToast();
@@ -23,7 +22,7 @@ export const SettingsView = () => {
   
   // States
   const [settings, setSettings] = useState<Settings>({
-    id: 1, entityName: '', entityType: 'Empresa', country: 'Brasil', currency: 'BRL',
+    id: 0, entityName: '', entityType: 'Empresa', country: 'Brasil', currency: 'BRL',
     customFieldsSchema: '[]', printSettings: '{"showSignatures": true, "signatures": []}'
   });
   const [showSignatures, setShowSignatures] = useState(true);
@@ -32,12 +31,10 @@ export const SettingsView = () => {
   // Categorias & Contas states
   const [categories, setCategories] = useState<Category[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [categoryCounts, setCategoryCounts] = useState<Record<number, number>>({});
 
   // Dialogs Open States
   const [isAccountsOpen, setIsAccountsOpen] = useState(false);
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
-  const [isDeleteDatabaseDialogOpen, setIsDeleteDatabaseDialogOpen] = useState(false);
 
   // Formulário Entidade/Contas/Categorias temporários
   const [accountName, setAccountName] = useState('');
@@ -48,86 +45,53 @@ export const SettingsView = () => {
   const [catTab, setCatTab] = useState<CategoryType>('Entrada');
 
   useEffect(() => {
-    loadSettings();
-    loadCategories();
-    loadAccounts();
+    loadData();
   }, []);
 
-  const loadSettings = async () => {
-    const db = await getDatabase();
-    const result = db.exec("SELECT * FROM settings LIMIT 1");
-    if (result.length > 0) {
-      const r = result[0].values[0];
-      const schema = r[5] as string || '[]';
-      const printStr = r[6] as string || '{"showSignatures": true, "signatures": []}';
-      
-      setSettings({
-        id: r[0] as number,
-        entityName: r[1] as string || '',
-        entityType: (r[2] as any === 'Sociedade' ? 'Pessoal' : r[2] as any) || 'Empresa',
-        country: r[3] as string || 'Brasil',
-        currency: r[4] as string || 'BRL',
-        customFieldsSchema: schema,
-        printSettings: printStr
-      });
-      
-      try {
-        const p = JSON.parse(printStr);
-        setShowSignatures(p.showSignatures ?? true);
-        setSignatures(p.signatures ?? []);
-      } catch (e) { 
-        setShowSignatures(true);
-        setSignatures([]);
+  const loadData = async () => {
+    try {
+      const [settingsData, categoriesData, accountsData] = await Promise.all([
+        apiService.getSettings().catch(() => null),
+        apiService.getCategories(),
+        apiService.getAccounts()
+      ]);
+
+      if (settingsData) {
+        setSettings(settingsData);
+        try {
+          const p = JSON.parse(settingsData.printSettings || '{"showSignatures": true, "signatures": []}');
+          setShowSignatures(p.showSignatures ?? true);
+          setSignatures(p.signatures ?? []);
+        } catch (e) { 
+          setShowSignatures(true);
+          setSignatures([]);
+        }
       }
+
+      setCategories(categoriesData);
+      setAccounts(accountsData);
+    } catch (error) {
+      console.error("Error loading settings data:", error);
     }
   };
 
-  const loadCategories = async () => {
-    const db = await getDatabase();
-    const catResult = db.exec("SELECT * FROM categories");
-    const countsResult = db.exec("SELECT categoryId, COUNT(*) FROM transactions GROUP BY categoryId");
-    
-    if (catResult.length > 0) {
-      const rows = catResult[0].values;
-      setCategories(rows.map(row => ({
-        id: row[0] as number, name: row[1] as string, type: row[2] as CategoryType,
-      })));
+  const handleQuickSaveCurrency = async (currency: string) => {
+    try {
+      const updatedSettings = { ...settings, currency };
+      await apiService.updateSettings(updatedSettings);
+      setSettings(updatedSettings);
+      toast({ title: "Moeda atualizada" });
+    } catch (error) {
+      toast({ title: "Erro ao atualizar moeda", variant: "destructive" });
     }
-    const counts: Record<number, number> = {};
-    if (countsResult.length > 0) {
-      countsResult[0].values.forEach(row => { counts[row[0] as number] = row[1] as number; });
-    }
-    setCategoryCounts(counts);
-  };
-
-  const loadAccounts = async () => {
-    const db = await getDatabase();
-    const result = db.exec("SELECT * FROM accounts");
-    if (result.length > 0) {
-      const rows = result[0].values;
-      setAccounts(rows.map(row => ({
-        id: row[0] as number, name: row[1] as string, type: row[2] as AccountType,
-        initialBalance: row[3] as number, currentBalance: row[4] as number,
-      })));
-    }
-  };
-
-  const handleQuickSave = async (updatedSettings: Settings) => {
-    const db = await getDatabase();
-    db.run(
-      "UPDATE settings SET currency = ? WHERE id = ?",
-      [updatedSettings.currency, updatedSettings.id]
-    );
-    saveDatabase(db);
-    toast({ title: "Moeda atualizada" });
   };
 
   const handleToggleSignatures = async (value: boolean) => {
     setShowSignatures(value);
-    const db = await getDatabase();
     const printSchema = JSON.stringify({ showSignatures: value, signatures });
-    db.run("UPDATE settings SET printSettings = ? WHERE id = ?", [printSchema, settings.id]);
-    saveDatabase(db);
+    const updatedSettings = { ...settings, printSettings: printSchema };
+    await apiService.updateSettings(updatedSettings);
+    setSettings(updatedSettings);
     toast({ title: value ? "Assinaturas ativadas" : "Assinaturas desativadas" });
   };
 
@@ -149,55 +113,44 @@ export const SettingsView = () => {
 
   const handleSaveSignatures = async (sigsToSave?: SignatureField[]) => {
     const targetSigs = sigsToSave || signatures;
-    const db = await getDatabase();
     const printSchema = JSON.stringify({ showSignatures, signatures: targetSigs });
-    db.run("UPDATE settings SET printSettings = ? WHERE id = ?", [printSchema, settings.id]);
-    saveDatabase(db);
+    const updatedSettings = { ...settings, printSettings: printSchema };
+    await apiService.updateSettings(updatedSettings);
+    setSettings(updatedSettings);
     toast({ title: "Assinaturas atualizadas" });
-  };
-
-  const handleExport = async () => {
-    try {
-      const success = await exportDatabase();
-      if (success) toast({ title: "Banco exportado com sucesso!" });
-    } catch (e) { toast({ title: "Erro ao exportar", variant: "destructive" }); }
-  };
-
-  const handleImport = async () => {
-    try {
-      const success = await importDatabase();
-      if (success) {
-        toast({ title: "Banco importado" });
-        setTimeout(() => relaunch(), 1000);
-      }
-    } catch (e) { toast({ title: "Erro ao importar", variant: "destructive" }); }
-  };
-
-  const deleteDatabase = async () => {
-    await deleteDatabaseFile();
-    window.location.reload();
   };
 
   const handleAddAccount = async () => {
     if (!accountName.trim()) return;
-    const db = await getDatabase();
-    const balance = parseFloat(initialBalance) || 0;
-    db.run(
-      "INSERT INTO accounts (name, type, initialBalance, currentBalance) VALUES (?, ?, ?, ?)",
-      [accountName, accountType, balance, balance]
-    );
-    saveDatabase(db);
-    setAccountName(''); setInitialBalance('0'); loadAccounts();
-    toast({ title: "Conta adicionada" });
+    try {
+      const balance = parseFloat(initialBalance) || 0;
+      await apiService.createAccount({
+        name: accountName,
+        type: accountType,
+        initial_balance: balance
+      });
+      setAccountName(''); 
+      setInitialBalance('0'); 
+      loadData();
+      toast({ title: "Conta adicionada" });
+    } catch (error) {
+      toast({ title: "Erro ao adicionar conta", variant: "destructive" });
+    }
   };
 
   const handleAddCategory = async () => {
     if (!newCatName.trim()) return;
-    const db = await getDatabase();
-    db.run("INSERT INTO categories (name, type) VALUES (?, ?)", [newCatName, catTab]);
-    saveDatabase(db);
-    setNewCatName(''); loadCategories();
-    toast({ title: "Categoria adicionada" });
+    try {
+      await apiService.createCategory({
+        name: newCatName,
+        type: catTab
+      });
+      setNewCatName(''); 
+      loadData();
+      toast({ title: "Categoria adicionada" });
+    } catch (error) {
+      toast({ title: "Erro ao adicionar categoria", variant: "destructive" });
+    }
   };
 
   const ToggleSwitch = ({ checked, onChange }: { checked: boolean, onChange: (v: boolean) => void }) => (
@@ -254,39 +207,7 @@ export const SettingsView = () => {
             </div>
           </div>
 
-          {/* Segurança e Dados */}
-          <div className="glass-panel rounded-2xl overflow-hidden">
-            <div className="p-4 border-b border-white/5 bg-black/5 dark:bg-white/5">
-              <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Dados e Transações</h3>
-            </div>
-            <div className="p-2 space-y-1">
-              <button onClick={handleExport} className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-secondary/50 transition-colors text-left group">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-emerald-500/10 text-emerald-500"><Download className="w-4 h-4" /></div>
-                  <span className="font-medium">Fazer Backup (Exportar)</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              </button>
-
-              <button onClick={handleImport} className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-secondary/50 transition-colors text-left group">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-purple-500/10 text-purple-500"><Upload className="w-4 h-4" /></div>
-                  <span className="font-medium">Restaurar (Importar)</span>
-                </div>
-                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-              </button>
-              
-              <button onClick={() => setIsDeleteDatabaseDialogOpen(true)} className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-destructive/10 text-destructive transition-colors text-left group">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-destructive/10 text-destructive"><Trash2 className="w-4 h-4" /></div>
-                  <span className="font-medium">Apagar Banco de Dados</span>
-                </div>
-                <ChevronRight className="w-4 h-4 opacity-50 group-hover:opacity-100 transition-colors" />
-              </button>
-            </div>
-          </div>
-
-          {/* Software Info & Updates */}
+          {/* Software Info */}
           <div className="glass-panel rounded-2xl overflow-hidden">
             <div className="p-4 border-b border-white/5 bg-black/5 dark:bg-white/5">
               <h3 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Software</h3>
@@ -294,26 +215,11 @@ export const SettingsView = () => {
             <div className="p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-primary/10 text-primary"><RefreshCw className="w-4 h-4" /></div>
                   <div>
-                    <span className="font-medium block text-sm">Atualizações</span>
-                    <span className="text-[10px] text-muted-foreground">Verificar nova versão no GitHub</span>
+                    <span className="font-medium block text-sm">Versão SaaS</span>
+                    <span className="text-[10px] text-muted-foreground">Otimizado para AWS Cloud</span>
                   </div>
                 </div>
-                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={async () => {
-                  try {
-                    const { check } = await import('@tauri-apps/plugin-updater');
-                    const update = await check();
-                    if (update) {
-                      toast({ title: "Nova versão disponível!", description: `Versão ${update.version} encontrada.` });
-                      await update.downloadAndInstall();
-                    } else {
-                      toast({ title: "Você já está na versão mais recente." });
-                    }
-                  } catch (e) {
-                    toast({ title: "Erro ao verificar atualizações", variant: "destructive" });
-                  }
-                }}>Verificar</Button>
               </div>
             </div>
           </div>
@@ -361,7 +267,7 @@ export const SettingsView = () => {
               <div className="space-y-4 pt-4 border-t border-white/5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-md bg-primary/10 text-primary"><User className="w-4 h-4" /></div>
+                    <div className="p-2 rounded-md bg-primary/10 text-primary"><Landmark className="w-4 h-4" /></div>
                     <span className="font-medium">Assinaturas do Relatório</span>
                   </div>
                   <Button variant="ghost" size="sm" onClick={handleAddSignature} className="text-primary hover:bg-primary/10">
@@ -410,12 +316,7 @@ export const SettingsView = () => {
                 </div>
                 <Select 
                   value={settings.currency} 
-                  onValueChange={(v) => {
-                    const newSettings = {...settings, currency: v};
-                    setSettings(newSettings);
-                    // Trigger save immediately for better UX
-                    handleQuickSave(newSettings);
-                  }}
+                  onValueChange={(v) => handleQuickSaveCurrency(v)}
                 >
                   <SelectTrigger className="w-[100px] bg-secondary border-none h-8 font-mono text-sm">
                     <SelectValue />
@@ -489,25 +390,10 @@ export const SettingsView = () => {
               {categories.map(cat => (
                 <div key={cat.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-background/40">
                   <span className="text-sm flex items-center gap-2">{cat.name} {cat.type === 'Entrada' ? <span className="text-[10px] text-emerald-500 bg-emerald-500/10 px-1 rounded">IN</span> : <span className="text-[10px] text-destructive bg-destructive/10 px-1 rounded">OUT</span>}</span>
-                  {categoryCounts[cat.id] > 0 && <span className="text-xs text-muted-foreground">{categoryCounts[cat.id]} transações</span>}
                 </div>
               ))}
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog Delete DB */}
-      <Dialog open={isDeleteDatabaseDialogOpen} onOpenChange={setIsDeleteDatabaseDialogOpen}>
-        <DialogContent className="glass-panel border-destructive/30">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-destructive"><AlertTriangle /> Apagar Banco de Dados</DialogTitle>
-            <DialogDescription>Atenção! Isso removerá todas as transações, categorias e contas criadas. Não tem volta.</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDeleteDatabaseDialogOpen(false)}>Cancelar</Button>
-            <Button variant="destructive" onClick={deleteDatabase}>Sim, Apagar Tudo</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 

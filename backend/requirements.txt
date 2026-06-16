@@ -1,0 +1,11 @@
+fastapi
+mangum
+sqlalchemy
+pydantic
+pydantic-settings
+boto3
+psycopg2-binary
+python-multipart
+uvicorn
+pyjwt[crypto]
+cryptography

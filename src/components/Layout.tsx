@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getVersion } from '@tauri-apps/api/app';
+import { apiService } from '@/lib/api';
 import { LayoutDashboard, ArrowLeftRight, Settings, FileText, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -26,19 +26,15 @@ const SidebarItem = ({ icon: Icon, label, active, onClick }: SidebarItemProps) =
 );
 
 export const Layout = ({ children, activeTab, setActiveTab }: { children: React.ReactNode, activeTab: string, setActiveTab: (tab: string) => void }) => {
-  const [appVersion, setAppVersion] = useState('');
+  const [appVersion] = useState('v0.2.0-saas');
   const [profileImage, setProfileImage] = useState('');
 
   useEffect(() => {
-    getVersion().then(v => setAppVersion(`v${v}`)).catch(() => setAppVersion('v0.1.0'));
-    
-    // Fetch profile image
-    import('@/lib/database').then(dbMod => dbMod.getDatabase()).then(db => {
-      const result = db.exec("SELECT profileImage FROM settings LIMIT 1");
-      if (result.length > 0) {
-        setProfileImage(result[0].values[0][0] as string || '');
+    apiService.getSettings().then(data => {
+      if (data && data.profile_image) {
+        setProfileImage(data.profile_image);
       }
-    });
+    }).catch(() => {});
   }, [activeTab]);
 
   const menuItems = [

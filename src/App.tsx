@@ -1,45 +1,32 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Layout } from '@/components/Layout'
-import { getDatabase } from '@/lib/database'
 import { DashboardView } from '@/components/DashboardView'
 import { TransactionsView } from '@/components/TransactionsView'
 import { ProfileView } from '@/components/ProfileView'
 import { SettingsView } from '@/components/SettingsView'
 import { ReportsView } from '@/components/ReportsView'
 import { Toaster } from '@/components/ui/toaster'
+import { Authenticator } from '@aws-amplify/ui-react'
+import '@aws-amplify/ui-react/styles.css'
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    getDatabase().then(() => {
-      setIsLoading(false)
-    })
-  }, [])
-
-  if (isLoading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-muted-foreground animate-pulse">Carregando Livro Caixa...</p>
-        </div>
-      </div>
-    )
-  }
 
   return (
-    <>
-      <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
-        {activeTab === 'dashboard' && <DashboardView />}
-        {activeTab === 'profile' && <ProfileView />}
-        {activeTab === 'transactions' && <TransactionsView />}
-        {activeTab === 'reports' && <ReportsView />}
-        {activeTab === 'settings' && <SettingsView />}
-      </Layout>
-      <Toaster />
-    </>
+    <Authenticator>
+      {({ signOut, user }) => (
+        <>
+          <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
+            {activeTab === 'dashboard' && <DashboardView />}
+            {activeTab === 'profile' && <ProfileView user={user} signOut={signOut} />}
+            {activeTab === 'transactions' && <TransactionsView />}
+            {activeTab === 'reports' && <ReportsView />}
+            {activeTab === 'settings' && <SettingsView />}
+          </Layout>
+          <Toaster />
+        </>
+      )}
+    </Authenticator>
   )
 }
 

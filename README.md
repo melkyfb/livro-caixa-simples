@@ -1,73 +1,56 @@
-# React + TypeScript + Vite
+# Livro Caixa Simples (SaaS Edition)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Este projeto foi migrado de um aplicativo desktop (Tauri) para uma arquitetura SaaS rodando na AWS.
 
-Currently, two official plugins are available:
+## Arquitetura
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Frontend:** React (SPA) + Vite + Tailwind CSS (Hospedado no S3/CloudFront).
+- **Backend:** Python (FastAPI) + AWS Lambda + API Gateway.
+- **Autenticação:** Amazon Cognito (User Pools) com suporte a MFA (Email, SMS, TOTP).
+- **Banco de Dados:** Amazon Aurora Serverless v2 (PostgreSQL).
+- **Infraestrutura:** AWS CDK (Python).
 
-## React Compiler
+## Estrutura do Projeto
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- `/src`: Código fonte do Frontend (React).
+- `/backend`: API FastAPI rodando em Python.
+- `/infra`: Definições de infraestrutura usando AWS CDK.
 
-## Expanding the ESLint configuration
+## Como Executar Localmente
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### Usando Docker (Recomendado)
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+A forma mais rápida de subir o ambiente completo (Frontend, Backend, DB e Roteamento) é usando Docker e Traefik:
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+1. Certifique-se de ter o Docker instalado.
+2. Execute o comando:
+   ```bash
+   docker compose up --build
+   ```
+3. Acesse nos seguintes endereços:
+   - **Frontend:** [http://app.localhost](http://app.localhost)
+   - **API (Swagger):** [http://api.localhost/docs](http://api.localhost/docs)
+   - **Traefik Dashboard:** [http://localhost:8080](http://localhost:8080)
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Execução Manual
+1. Navegue até `/backend`.
+2. Crie um ambiente virtual: `python -m venv .venv`.
+3. Instale as dependências: `pip install -r requirements.txt`.
+4. Execute: `uvicorn app.main:app --reload`.
+
+### Frontend
+1. Na raiz, instale as dependências: `npm install`.
+2. Configure o arquivo `.env` com as variáveis do Cognito e da API (veja `.env.example`).
+3. Execute: `npm run dev`.
+
+## Deployment (MVP Mode)
+
+O deploy é automatizado via GitHub Actions e disparado pela criação de uma nova tag de versão:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+---
+**Nota:** O repositório deve ser mantido como **Privado**.

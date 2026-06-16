@@ -129,6 +129,11 @@ export const ProfileView = () => {
               <p className="text-sm text-muted-foreground mt-1 flex items-center justify-center gap-1">
                 <Briefcase size={12} /> {settings.entityType}
               </p>
+              {user && (
+                <p className="text-[10px] text-muted-foreground mt-2 opacity-50 truncate px-4">
+                  UID: {user.userId}
+                </p>
+              )}
             </div>
 
             <div className="w-full pt-6 border-t border-white/5 space-y-3">
@@ -141,6 +146,16 @@ export const ProfileView = () => {
                 <span>Localização Padrão</span>
               </div>
             </div>
+
+            {signOut && (
+              <Button 
+                variant="outline" 
+                onClick={signOut}
+                className="w-full mt-4 border-destructive/20 text-destructive hover:bg-destructive/10"
+              >
+                <LogOut className="w-4 h-4 mr-2" /> Sair da Conta
+              </Button>
+            )}
           </div>
         </div>
 

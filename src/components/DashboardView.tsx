@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getDatabase } from '@/lib/database';
+import { apiService } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -23,61 +23,82 @@ export const DashboardView = () => {
   }, [period]);
 
   const loadData = async () => {
-    const db = await getDatabase();
-    
-    // Load Settings
-    const settingsResult = db.exec("SELECT currency, entityName FROM settings LIMIT 1");
-    if (settingsResult.length > 0) {
-      setCurrency(settingsResult[0].values[0][0] as string || 'BRL');
-      setEntityName(settingsResult[0].values[0][1] as string || '');
-    }
+    try {
+      const [accounts, categories, transactions, settings] = await Promise.all([
+        apiService.getAccounts(),
+        apiService.getCategories(),
+        apiService.getTransactions(),
+        apiService.getSettings().catch(() => null)
+      ]);
 
-    // Calcular datas baseadas no período
-    const now = new Date();
-    let startDate = new Date();
-    if (period === 'month') startDate.setDate(1);
-    else if (period === 'quarter') startDate.setMonth(Math.floor(now.getMonth() / 3) * 3, 1);
-    else if (period === 'semester') startDate.setMonth(now.getMonth() < 6 ? 0 : 6, 1);
-    else if (period === 'year') startDate.setMonth(0, 1);
-    const startDateStr = startDate.toISOString().split('T')[0];
+      if (settings) {
+        setCurrency(settings.currency || 'BRL');
+        setEntityName(settings.entity_name || '');
+      }
 
-    // Totals
-    const income = (db.exec("SELECT SUM(value) FROM transactions WHERE type = 'Entrada' AND date >= ?", [startDateStr])[0]?.values[0][0] as number) || 0;
-    const expense = (db.exec("SELECT SUM(value) FROM transactions WHERE type = 'Saída' AND date >= ?", [startDateStr])[0]?.values[0][0] as number) || 0;
-    const balance = (db.exec("SELECT SUM(currentBalance) FROM accounts")[0]?.values[0][0] as number) || 0;
-    
-    // Simple previous balance (start of period)
-    const prevBalance = balance - (income - expense);
-    setTotals({ income, expense, balance, previousBalance: prevBalance });
+      // Calcular datas baseadas no período
+      const now = new Date();
+      let startDate = new Date();
+      if (period === 'month') startDate.setDate(1);
+      else if (period === 'quarter') startDate.setMonth(Math.floor(now.getMonth() / 3) * 3, 1);
+      else if (period === 'semester') startDate.setMonth(now.getMonth() < 6 ? 0 : 6, 1);
+      else if (period === 'year') startDate.setMonth(0, 1);
+      startDate.setHours(0, 0, 0, 0);
+      const startTime = startDate.getTime();
 
-    // Recent Transactions
-    const recentResult = db.exec(`
-      SELECT t.*, c.name as categoryName 
-      FROM transactions t 
-      LEFT JOIN categories c ON t.categoryId = c.id 
-      ORDER BY t.date DESC, t.id DESC LIMIT 5
-    `);
-    setRecentTransactions(recentResult.length > 0 ? recentResult[0].values.map(r => ({ id: r[0], date: r[1], value: r[2], description: r[3], type: r[4], categoryName: r[11] })) : []);
-
-    // Allocation Data (By Account)
-    const accResult = db.exec("SELECT name, currentBalance FROM accounts WHERE currentBalance > 0");
-    if (accResult.length > 0) {
-      setAllocationData(accResult[0].values.map(r => ({ name: r[0], value: r[1] })));
-    }
-
-    // Growth Data (Last 6 Months)
-    const growth = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      const m = d.toLocaleString('default', { month: 'short' });
-      const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
+      // Filter transactions for period
+      const filteredTransactions = transactions.filter((t: any) => new Date(t.date).getTime() >= startTime);
       
-      const mBalance = (db.exec("SELECT SUM(value) FROM transactions WHERE type = 'Entrada' AND date <= ?", [lastDay])[0]?.values[0][0] as number || 0) -
-                       (db.exec("SELECT SUM(value) FROM transactions WHERE type = 'Saída' AND date <= ?", [lastDay])[0]?.values[0][0] as number || 0);
-      growth.push({ name: m, value: mBalance });
+      const income = filteredTransactions
+        .filter((t: any) => t.type === 'Entrada')
+        .reduce((sum: number, t: any) => sum + t.value, 0);
+        
+      const expense = filteredTransactions
+        .filter((t: any) => t.type === 'Saída')
+        .reduce((sum: number, t: any) => sum + t.value, 0);
+        
+      const balance = accounts.reduce((sum: number, a: any) => sum + (a.current_balance || 0), 0);
+      const prevBalance = balance - (income - expense);
+      
+      setTotals({ income, expense, balance, previousBalance: prevBalance });
+
+      // Recent Transactions (top 5)
+      const sortedTransactions = [...transactions].sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setRecentTransactions(sortedTransactions.slice(0, 5).map((t: any) => ({
+        ...t,
+        categoryName: categories.find((c: any) => c.id === t.category_id)?.name
+      })));
+
+      // Allocation Data
+      setAllocationData(accounts
+        .filter((a: any) => a.current_balance > 0)
+        .map((a: any) => ({ name: a.name, value: a.current_balance }))
+      );
+
+      // Growth Data (last 6 months)
+      const growth = [];
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const m = d.toLocaleString('default', { month: 'short' });
+        const endOfMonth = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+        endOfMonth.setHours(23, 59, 59, 999);
+        
+        const mIncome = transactions
+          .filter((t: any) => t.type === 'Entrada' && new Date(t.date).getTime() <= endOfMonth.getTime())
+          .reduce((sum: number, t: any) => sum + t.value, 0);
+          
+        const mExpense = transactions
+          .filter((t: any) => t.type === 'Saída' && new Date(t.date).getTime() <= endOfMonth.getTime())
+          .reduce((sum: number, t: any) => sum + t.value, 0);
+          
+        growth.push({ name: m, value: mIncome - mExpense });
+      }
+      setGrowthData(growth);
+
+    } catch (error) {
+      console.error("Error loading dashboard data:", error);
     }
-    setGrowthData(growth);
   };
 
   const formatCurrency = (value: number) => {

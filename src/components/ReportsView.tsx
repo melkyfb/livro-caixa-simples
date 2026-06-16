@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getDatabase } from '@/lib/database';
+import { apiService } from '@/lib/api';
 import type { SignatureField, CustomField } from '@/types/index';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -26,64 +26,70 @@ export const ReportsView = () => {
   }, [period]);
 
   const loadReport = async () => {
-    const db = await getDatabase();
-    
-    // Calcular datas
-    const now = new Date();
-    let startDate = new Date();
-    if (period === 'month') startDate.setDate(1);
-    else if (period === 'quarter') startDate.setMonth(Math.floor(now.getMonth() / 3) * 3, 1);
-    else if (period === 'semester') startDate.setMonth(now.getMonth() < 6 ? 0 : 6, 1);
-    else if (period === 'year') startDate.setMonth(0, 1);
-    
-    const startDateStr = startDate.toISOString().split('T')[0];
+    try {
+      const [accounts, categories, transactions, settings] = await Promise.all([
+        apiService.getAccounts(),
+        apiService.getCategories(),
+        apiService.getTransactions(),
+        apiService.getSettings().catch(() => null)
+      ]);
 
-    // Totais
-    const income = db.exec("SELECT SUM(value) FROM transactions WHERE type = 'Entrada' AND date >= ?", [startDateStr])[0]?.values[0][0] as number || 0;
-    const expense = db.exec("SELECT SUM(value) FROM transactions WHERE type = 'Saída' AND date >= ?", [startDateStr])[0]?.values[0][0] as number || 0;
+      // Calcular datas
+      const now = new Date();
+      let startDate = new Date();
+      if (period === 'month') startDate.setDate(1);
+      else if (period === 'quarter') startDate.setMonth(Math.floor(now.getMonth() / 3) * 3, 1);
+      else if (period === 'semester') startDate.setMonth(now.getMonth() < 6 ? 0 : 6, 1);
+      else if (period === 'year') startDate.setMonth(0, 1);
+      startDate.setHours(0, 0, 0, 0);
+      const startTime = startDate.getTime();
 
-    // Categorias
-    const catResult = db.exec(`
-      SELECT c.name, SUM(t.value) as total, c.type 
-      FROM transactions t 
-      JOIN categories c ON t.categoryId = c.id 
-      WHERE t.date >= ? 
-      GROUP BY c.id
-    `, [startDateStr]);
-    const categories = catResult.length > 0 ? catResult[0].values.map(r => ({ name: r[0], total: r[1], type: r[2] })) : [];
+      const filteredTransactions = transactions.filter((t: any) => new Date(t.date).getTime() >= startTime);
 
-    // Transações detalhadas
-    const transResult = db.exec(`
-      SELECT t.date, t.description, c.name as categoryName, a.name as accountName, t.value, t.type 
-      FROM transactions t 
-      LEFT JOIN categories c ON t.categoryId = c.id 
-      LEFT JOIN accounts a ON t.accountId = a.id 
-      WHERE t.date >= ? 
-      ORDER BY t.date ASC
-    `, [startDateStr]);
-    const transactions = transResult.length > 0 ? transResult[0].values.map(r => ({
-      date: r[0], description: r[1], category: r[2], account: r[3], value: r[4], type: r[5]
-    })) : [];
+      const income = filteredTransactions
+        .filter((t: any) => t.type === 'Entrada')
+        .reduce((sum: number, t: any) => sum + t.value, 0);
+        
+      const expense = filteredTransactions
+        .filter((t: any) => t.type === 'Saída')
+        .reduce((sum: number, t: any) => sum + t.value, 0);
 
-    // Configurações da Entidade
-    const settingsResult = db.exec("SELECT * FROM settings LIMIT 1");
-    let settings = null;
-    let customFields = [];
-    let printConfig = { showSignatures: true, signatures: [] };
+      const reportCategories = categories.map((c: any) => ({
+        name: c.name,
+        type: c.type,
+        total: filteredTransactions
+          .filter((t: any) => t.category_id === c.id)
+          .reduce((sum: number, t: any) => sum + t.value, 0)
+      })).filter((c: any) => c.total > 0);
 
-    if (settingsResult.length > 0) {
-      const r = settingsResult[0].values[0];
-      settings = { 
-        name: r[1], 
-        type: r[2], 
-        country: r[3],
-        currency: r[4]
-      };
-      try { customFields = JSON.parse(r[5] as string || '[]'); } catch(e) {}
-      try { printConfig = JSON.parse(r[6] as string || '{"showSignatures": true, "signatures": []}'); } catch(e) {}
+      const reportTransactions = filteredTransactions.map((t: any) => ({
+        date: t.date,
+        description: t.description,
+        category: categories.find((c: any) => c.id === t.category_id)?.name,
+        account: accounts.find((a: any) => a.id === t.account_id)?.name,
+        value: t.value,
+        type: t.type
+      }));
+
+      let customFields = [];
+      let printConfig = { showSignatures: true, signatures: [] };
+
+      if (settings) {
+        try { customFields = JSON.parse(settings.customFieldsSchema || '[]'); } catch(e) {}
+        try { printConfig = JSON.parse(settings.printSettings || '{"showSignatures": true, "signatures": []}'); } catch(e) {}
+      }
+
+      setReportData({ 
+        totals: { income, expense, balance: income - expense }, 
+        categories: reportCategories, 
+        transactions: reportTransactions, 
+        settings, 
+        customFields, 
+        printConfig 
+      });
+    } catch (error) {
+      console.error("Error loading report data:", error);
     }
-
-    setReportData({ totals: { income, expense, balance: income - expense }, categories, transactions, settings, customFields, printConfig });
   };
 
   const handlePrint = () => {
@@ -145,10 +151,10 @@ export const ReportsView = () => {
         <header className="flex justify-between items-start border-b-2 border-primary pb-6 mb-8">
           <div>
             <h1 className="text-3xl font-black text-primary uppercase tracking-tighter leading-none mb-1">
-              {reportData.settings?.name || 'LIVRO CAIXA'}
+              {reportData.settings?.entity_name || 'LIVRO CAIXA'}
             </h1>
             <p className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
-              <Building2 className="h-3 w-3" /> {reportData.settings?.type} • {reportData.settings?.country}
+              <Building2 className="h-3 w-3" /> {reportData.settings?.entity_type} • {reportData.settings?.country}
             </p>
             
             {/* Campos Customizados da Entidade (Endereço, etc) */}

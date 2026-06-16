@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getDatabase, saveDatabase } from '@/lib/database';
+import { apiService } from '@/lib/api';
 import type { Account, Category, CategoryType, Transaction } from '@/types/index';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,89 +38,63 @@ export const TransactionsView = () => {
   }, []);
 
   const loadData = async () => {
-    const db = await getDatabase();
-    
-    // Load Settings
-    const settingsResult = db.exec("SELECT currency FROM settings LIMIT 1");
-    if (settingsResult.length > 0) {
-      setCurrency(settingsResult[0].values[0][0] as string || 'BRL');
-    }
+    try {
+      const [accountsData, categoriesData, transactionsData, settingsData] = await Promise.all([
+        apiService.getAccounts(),
+        apiService.getCategories(),
+        apiService.getTransactions(),
+        apiService.getSettings().catch(() => null)
+      ]);
 
-    // Load Accounts
-    const accResult = db.exec("SELECT * FROM accounts");
-    if (accResult.length > 0) {
-      setAccounts(accResult[0].values.map(r => ({ id: r[0], name: r[1], type: r[2], initialBalance: r[3], currentBalance: r[4] })) as any);
-    }
+      setAccounts(accountsData);
+      setCategories(categoriesData);
+      
+      const enrichedTransactions = transactionsData.map((t: any) => ({
+        ...t,
+        accountName: accountsData.find((a: any) => a.id === t.account_id)?.name,
+        categoryName: categoriesData.find((c: any) => c.id === t.category_id)?.name
+      }));
+      setTransactions(enrichedTransactions);
 
-    // Load Categories
-    const catResult = db.exec("SELECT * FROM categories");
-    if (catResult.length > 0) {
-      setCategories(catResult[0].values.map(r => ({ id: r[0], name: r[1], type: r[2] })) as any);
-    }
-
-    // Load Transactions
-    const transResult = db.exec(`
-      SELECT t.*, a.name as accountName, c.name as categoryName 
-      FROM transactions t 
-      LEFT JOIN accounts a ON t.accountId = a.id 
-      LEFT JOIN categories c ON t.categoryId = c.id
-      ORDER BY t.date DESC, t.id DESC
-    `);
-    if (transResult.length > 0) {
-      setTransactions(transResult[0].values.map(r => ({ 
-        id: r[0], date: r[1], value: r[2], description: r[3], type: r[4], 
-        accountId: r[5], destinationAccountId: r[6], categoryId: r[7],
-        accountName: r[10], categoryName: r[11] 
-      })) as any);
-    } else {
-      setTransactions([]);
+      if (settingsData) {
+        setCurrency(settingsData.currency || 'BRL');
+      }
+    } catch (error) {
+      console.error("Error loading data:", error);
     }
   };
 
   const handleAddTransaction = async () => {
     if (!value || !accountId || (type !== 'Transferência' && !categoryId) || (type === 'Transferência' && !destinationAccountId)) return;
 
-    const db = await getDatabase();
-    const val = parseFloat(value);
-    
-    db.run(
-      "INSERT INTO transactions (date, value, description, type, accountId, destinationAccountId, categoryId) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [date, val, description, type, parseInt(accountId), destinationAccountId ? parseInt(destinationAccountId) : null, categoryId ? parseInt(categoryId) : null]
-    );
+    try {
+      const payload = {
+        date,
+        value: parseFloat(value),
+        description,
+        type,
+        account_id: parseInt(accountId),
+        destination_account_id: destinationAccountId ? parseInt(destinationAccountId) : null,
+        category_id: categoryId ? parseInt(categoryId) : 0 // Backend expects an int
+      };
 
-    // Atualizar Saldo
-    if (type === 'Entrada') {
-      db.run("UPDATE accounts SET currentBalance = currentBalance + ? WHERE id = ?", [val, parseInt(accountId)]);
-    } else if (type === 'Saída') {
-      db.run("UPDATE accounts SET currentBalance = currentBalance - ? WHERE id = ?", [val, parseInt(accountId)]);
-    } else if (type === 'Transferência' && destinationAccountId) {
-      db.run("UPDATE accounts SET currentBalance = currentBalance - ? WHERE id = ?", [val, parseInt(accountId)]);
-      db.run("UPDATE accounts SET currentBalance = currentBalance + ? WHERE id = ?", [val, parseInt(destinationAccountId)]);
+      await apiService.createTransaction(payload);
+      setValue('');
+      setDescription('');
+      setIsAddModalOpen(false);
+      loadData();
+    } catch (error) {
+      console.error("Error adding transaction:", error);
     }
-
-    saveDatabase(db);
-    setValue('');
-    setDescription('');
-    setIsAddModalOpen(false);
-    loadData();
   };
 
-  const handleDeleteTransaction = async (trans: any) => {
-    const db = await getDatabase();
-    
-    // Reverter Saldo
-    if (trans.type === 'Entrada') {
-      db.run("UPDATE accounts SET currentBalance = currentBalance - ? WHERE id = ?", [trans.value, trans.accountId]);
-    } else if (trans.type === 'Saída') {
-      db.run("UPDATE accounts SET currentBalance = currentBalance + ? WHERE id = ?", [trans.value, trans.accountId]);
-    } else if (trans.type === 'Transferência' && trans.destinationAccountId) {
-      db.run("UPDATE accounts SET currentBalance = currentBalance + ? WHERE id = ?", [trans.value, trans.accountId]);
-      db.run("UPDATE accounts SET currentBalance = currentBalance - ? WHERE id = ?", [trans.value, trans.destinationAccountId]);
+  const handleDeleteTransaction = async (transId: number) => {
+    try {
+      await apiService.deleteTransaction(transId);
+      loadData();
+    } catch (error) {
+      console.error("Error deleting transaction:", error);
     }
-
-    db.run("DELETE FROM transactions WHERE id = ?", [trans.id]);
-    saveDatabase(db);
-    loadData();
   };
 
   const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(val);
@@ -306,6 +280,45 @@ export const TransactionsView = () => {
             </div>
 
             {type === 'Transferência' ? (
+              <div className="space-y-2">
+                <Label>Conta de Destino</Label>
+                <Select value={destinationAccountId} onValueChange={setDestinationAccountId}>
+                  <SelectTrigger className="bg-background/50 border-white/10">
+                    <SelectValue placeholder="Selecione o destino" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.filter(acc => acc.id.toString() !== accountId).map(acc => (
+                      <SelectItem key={acc.id} value={acc.id.toString()}>{acc.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Categoria</Label>
+                <Select value={categoryId} onValueChange={setCategoryId}>
+                  <SelectTrigger className="bg-background/50 border-white/10">
+                    <SelectValue placeholder="Selecione a categoria" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.filter(c => c.type === type).map(cat => (
+                      <SelectItem key={cat.id} value={cat.id.toString()}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsAddModalOpen(false)}>Cancelar</Button>
+            <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleAddTransaction}>Salvar Lançamento</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+ype === 'Transferência' ? (
               <div className="space-y-2">
                 <Label>Conta de Destino</Label>
                 <Select value={destinationAccountId} onValueChange={setDestinationAccountId}>
